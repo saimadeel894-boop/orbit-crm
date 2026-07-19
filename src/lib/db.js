@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { mapContactToSupabase } from './mappers';
 
 // Helper to get current user ID
 const getUid = async () => {
@@ -15,7 +16,7 @@ const handleResponse = (res) => ({
 
 // --- CONTACTS ---
 
-export const getContacts = async ({ businessId, page = 1, pageSize = 50, search = '', callStatus = '', orderBy = 'created_at' }) => {
+export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50, search = '', callStatus = '', orderBy = 'created_at' }) => {
   const uid = await getUid();
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -26,6 +27,7 @@ export const getContacts = async ({ businessId, page = 1, pageSize = 50, search 
     .eq('user_id', uid);
 
   if (businessId && businessId !== 'all') query = query.eq('business_id', businessId);
+  if (listId && listId !== 'all') query = query.eq('lead_list_id', listId);
   if (callStatus && callStatus !== 'all') query = query.eq('call_status', callStatus);
   if (search) query = query.ilike('name', `%${search}%`);
 
@@ -56,7 +58,7 @@ export const batchImportContacts = async (rows) => {
   let allError = null;
 
   for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize).map(r => ({ ...r, user_id: uid }));
+    const chunk = rows.slice(i, i + chunkSize).map(r => mapContactToSupabase(r, uid));
     const { data, error } = await supabase.from('contacts').insert(chunk).select(); // Supabase ignores duplicates if unique constraints are set, or we can use upsert
     if (error) { allError = error; break; }
     if (data) allData = [...allData, ...data];

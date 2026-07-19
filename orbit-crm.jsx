@@ -3142,8 +3142,9 @@ function ImportWizard({ cx, lk, preList, onClose }) {
     else cx.updateList(listId, { status: "Active", lastActivity: nowISO() });
     const { news, updates, rejected } = preparedRef.current;
     const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listIds: [listId], importId: impId }));
-    // insert in one shot (map pass) — fast even at scale
-    cx.addContacts(newContacts);
+    // Insert via Supabase batch API
+    await dbApi.batchImportContacts(newContacts);
+    cx.addContacts(newContacts); // also add to local memory to avoid waiting for reload
     if (updates.length) {
       const upById = new Map(updates.map(u => [u.id, u]));
       cx.bulkUpdate(new Set(updates.map(u => u.id)), (c) => {
@@ -3366,6 +3367,7 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
     setLoading(true);
     const { data, count, error } = await dbApi.getContacts({
       businessId: f.business,
+      listId: f.list,
       search: dq,
       callStatus: f.callStatus,
       page: page + 1,

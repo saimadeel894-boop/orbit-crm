@@ -60,6 +60,7 @@ export const batchImportContacts = async (rows) => {
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize).map(r => mapContactToSupabase(r, uid));
     const { data, error } = await supabase.from('contacts').insert(chunk).select(); // Supabase ignores duplicates if unique constraints are set, or we can use upsert
+    console.log("Supabase insert response:", data, error);
     if (error) { allError = error; break; }
     if (data) allData = [...allData, ...data];
   }

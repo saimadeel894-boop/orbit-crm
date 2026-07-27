@@ -2687,7 +2687,6 @@ function useContacts(db, update, toast) {
 
   /* load */
   useEffect(() => {
-    let list = db?.contacts || [];
     let meta = {
       dnc: db?.dnc || { phones: {}, emails: {} },
       contactFilters: db?.contactFilters || [],
@@ -2697,13 +2696,9 @@ function useContacts(db, update, toast) {
       lists: db?.lists || [],
       customOutcomes: db?.customOutcomes || []
     };
-    if (list.length === 0 && (!meta.lists || meta.lists.length === 0)) {
-      const seed = seedContactData(); 
-      meta = { ...meta, ...seed.cdb }; 
-      list = seed.contacts;
-    }
-    setCdb(meta); setContacts(list.map(recompute)); setCloaded(true);
-  }, [db?.contacts]);
+    setCdb(meta); 
+    if (db) setCloaded(true);
+  }, [db]);
 
   const cupdate = useCallback((mut) => setCdb(prev => { const n = structuredClone(prev); mut(n); return n; }), []);
 
@@ -3379,7 +3374,7 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
       setTotalCount(count || 0);
     }
     setLoading(false);
-  }, [f.business, f.callStatus, dq, page, pageSize, sort.key, refresh]);
+  }, [f.business, f.list, f.callStatus, dq, page, pageSize, sort.key, refresh]);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 

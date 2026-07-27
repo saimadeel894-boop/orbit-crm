@@ -10,7 +10,7 @@ import {
   Database, Folder, FolderPlus, ListChecks, ListFilter, SkipForward, Play, Pause, RotateCcw,
   Undo2, Columns, ChevronDown, FileSpreadsheet, FileUp, CheckCircle2, XCircle, Gauge, Tag,
   Rows3, ThumbsDown, Info, ArrowLeft, CircleSlash, MoveRight, Contact as ContactIcon,
-  CalendarPlus, Save, Eraser, Snowflake
+  CalendarPlus, Save, Eraser, Snowflake, LogOut
 } from "lucide-react";
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -19,7 +19,7 @@ import {
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { supabase } from "./src/lib/supabase";
-import { getSession, onAuthChange } from "./src/lib/auth";
+import { getSession, onAuthChange, signOut } from "./src/lib/auth";
 import LoginScreen from "./src/components/LoginScreen";
 import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, mapContactToLocal } from "./src/lib/mappers";
 import * as dbApi from "./src/lib/db";
@@ -301,7 +301,7 @@ const CSS = `
 
 .app-shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
 .sidebar { background: var(--panel); border-right: 1px solid var(--line);
-  display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+  display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 .brand { display:flex; align-items:center; gap:10px; padding: 18px 18px 14px; }
 .brand-mark { width: 30px; height: 30px; border-radius: 9px; background: var(--accent);
   display:grid; place-items:center; color:#fff; flex-shrink:0;
@@ -2013,8 +2013,13 @@ export default function App() {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => subscription?.unsubscribe();
   }, []);
+
+  const handleLogout = async () => {
+    await signOut();
+    setSession(null);
+  };
 
   useEffect(() => {
     if (!session) return;
@@ -2101,7 +2106,7 @@ export default function App() {
   if (!session) return <LoginScreen />;
   if (!db) return <div style={{ padding: 40, fontFamily: "Inter, sans-serif" }}>Loading…</div>;
 
-  const theme = db.settings.theme;
+  const theme = localStorage.getItem("orbit_theme") || db.settings.theme;
   const openLead = db.leads.find(l => l.id === openLeadId) || null;
 
   /* ---- lead handlers ---- */
@@ -2301,8 +2306,15 @@ export default function App() {
               ))}
             </nav>
             <div className="sidebar-foot">
-              <button className="nav-item" onClick={() => update(n => { n.settings.theme = theme === "light" ? "dark" : "light"; })}>
+              <button className="nav-item" onClick={() => {
+                const newTheme = theme === "light" ? "dark" : "light";
+                localStorage.setItem("orbit_theme", newTheme);
+                update(n => { n.settings.theme = newTheme; });
+              }}>
                 {theme === "light" ? <Moon size={17} /> : <Sun size={17} />} {theme === "light" ? "Dark mode" : "Light mode"}
+              </button>
+              <button className="nav-item" onClick={handleLogout} style={{ marginTop: 8 }}>
+                <LogOut size={17} /> Log out
               </button>
             </div>
           </aside>
@@ -3372,7 +3384,7 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
       pageSize,
       orderBy: sort.key === 'company' ? 'company' : sort.key === 'created_at' ? 'created_at' : 'name'
       });
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load. Please refresh.")), 10000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load. Please refresh.")), 5000));
       const { data, count, error } = await Promise.race([fetchPromise, timeoutPromise]);
       if (error) {
         setErrorState(error.message || "Unknown error occurred");

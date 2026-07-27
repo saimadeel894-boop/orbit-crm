@@ -3357,10 +3357,13 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
   const [contacts, setContacts] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [errorState, setErrorState] = useState(null);
 
   const loadContacts = useCallback(async () => {
     setLoading(true);
-    const { data, count, error } = await dbApi.getContacts({
+    setErrorState(null);
+    try {
+      const fetchPromise = dbApi.getContacts({
       businessId: f.business,
       listId: f.list,
       search: dq,
@@ -3368,12 +3371,20 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
       page: page + 1,
       pageSize,
       orderBy: sort.key === 'company' ? 'company' : sort.key === 'created_at' ? 'created_at' : 'name'
-    });
-    if (!error && data) {
-      setContacts(data.map(mapContactToLocal));
-      setTotalCount(count || 0);
+      });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load. Please refresh.")), 10000));
+      const { data, count, error } = await Promise.race([fetchPromise, timeoutPromise]);
+      if (error) {
+        setErrorState(error.message || "Unknown error occurred");
+      } else if (data) {
+        setContacts(data.map(mapContactToLocal));
+        setTotalCount(count || 0);
+      }
+    } catch (e) {
+      setErrorState(e.message || "Failed to load. Please refresh.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [f.business, f.list, f.callStatus, dq, page, pageSize, sort.key, refresh]);
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
@@ -3443,8 +3454,9 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
 
       <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>{totalCount.toLocaleString()} contacts</div>
 
-      {loading && <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading contacts...</div>}
-      {!loading && <div className="dtable-wrap" style={{ maxHeight: "58vh" }}>
+      {errorState && <div style={{ padding: "20px 0", color: "var(--red)" }}>{errorState}</div>}
+      {loading && !errorState && <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading contacts...</div>}
+      {!loading && !errorState && <div className="dtable-wrap" style={{ maxHeight: "58vh" }}>
         <table className="dtable">
           <thead>
             <tr>

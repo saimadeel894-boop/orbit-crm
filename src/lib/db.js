@@ -33,7 +33,11 @@ export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50,
 
   query = query.order(orderBy, { ascending: false }).range(from, to);
 
-  return handleResponse(await query);
+  console.log("Before getContacts query", { businessId, listId });
+  const res = await query;
+  console.log("After getContacts query:", res);
+
+  return handleResponse(res);
 };
 
 export const createContact = async (data) => {

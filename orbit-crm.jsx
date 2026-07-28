@@ -265,7 +265,7 @@ function buildInitialState() {
     lossReasons: DEFAULT_LOSS_REASONS,
     leads,
     tasks: seedTasks(leads),
-    settings: { coldDays: 7, theme: "light" },
+    settings: { coldDays: 7, theme: localStorage.getItem("orbit_theme") || "light" },
   };
 }
 
@@ -2055,7 +2055,7 @@ export default function App() {
           leads: leads || [],
           tasks: tasks || [],
           lossReasons: DEFAULT_LOSS_REASONS,
-          settings: { coldDays: 7, theme: "light" },
+          settings: { coldDays: 7, theme: localStorage.getItem("orbit_theme") || "light" },
           dnc: { phones: {}, emails: {} },
           contactFilters: [],
           mappingTemplates: []
@@ -2314,7 +2314,7 @@ export default function App() {
                 {theme === "light" ? <Moon size={17} /> : <Sun size={17} />} {theme === "light" ? "Dark mode" : "Light mode"}
               </button>
               <button className="nav-item" onClick={handleLogout} style={{ marginTop: 8 }}>
-                <LogOut size={17} /> Log out
+                <LogOut size={17} /> Log Out
               </button>
             </div>
           </aside>

@@ -50,6 +50,7 @@ export const mapContactToSupabase = (l, userId) => ({
   notes: l.notes || null,
   tags: l.tags || [],
   lead_list_id: l.listId || (l.listIds && l.listIds[0]) || null,
+  user_id: userId,
   updated_at: new Date().toISOString(),
   ...(userId ? { user_id: userId } : {})
 });

@@ -1105,7 +1105,7 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
     { key: "overview", label: "Overview" },
     { key: "qual", label: "Qualification" },
     { key: "deal", label: "Deal" },
-    { key: "activity", label: "Activity", count: lead.interactions.length },
+    { key: "activity", label: "Activity", count: (lead.interactions || []).length },
     { key: "tasks", label: "Tasks", count: leadTasks.length },
   ];
 
@@ -1250,9 +1250,9 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
         {tab === "activity" && (
           <div>
             <button className="btn btn-primary btn-sm" style={{ marginBottom: 16 }} onClick={() => onLog(lead)}><Plus size={14} />Log interaction</button>
-            {lead.interactions.length === 0 ? <Empty icon={MessageSquare} title="No activity yet" sub="Log your first call, email or note." /> : (
+            {(lead.interactions || []).length === 0 ? <Empty icon={MessageSquare} title="No activity yet" sub="Log your first call, email or note." /> : (
               <div className="timeline">
-                {[...lead.interactions].sort((a, b) => new Date(b.date) - new Date(a.date)).map(it => {
+                {[...(lead.interactions || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).map(it => {
                   const meta = INTERACTION_TYPES.find(t => t.key === it.type) || INTERACTION_TYPES[8];
                   return (
                     <div key={it.id} className="tl-item">
@@ -1362,7 +1362,7 @@ function Dashboard({ db, lk, filters, setFilters, onOpen, onToggleTask }) {
   const newThisWeek = scoped.filter(l => daysAgo(l.createdAt) !== null && daysAgo(l.createdAt) <= 7).length;
 
   // interaction-derived counts
-  const allInts = scoped.flatMap(l => l.interactions.map(i => ({ ...i, lead: l })));
+  const allInts = scoped.flatMap(l => (l.interactions || []).map(i => ({ ...i, lead: l })));
   const inW = (i) => inWindow(i.date);
   const calls = allInts.filter(i => i.type === "call" && inW(i)).length;
   const meetings = allInts.filter(i => i.type === "meeting" && inW(i)).length;
@@ -2261,7 +2261,7 @@ export default function App() {
     (l.email || "").toLowerCase().includes(q) || (l.phone || "").replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
     (l.painPoints || "").toLowerCase().includes(q) || (lk.ind(l.industryId)?.name || "").toLowerCase().includes(q) ||
     (lk.biz(l.businessId)?.name || "").toLowerCase().includes(q) ||
-    l.interactions.some(i => (i.notes || "").toLowerCase().includes(q))
+    (l.interactions || []).some(i => (i.notes || "").toLowerCase().includes(q))
   )).slice(0, 8) : [];
 
   const openLeadFrom = (id) => { setOpenLeadId(id); setSearch(""); setSearchOpen(false); };

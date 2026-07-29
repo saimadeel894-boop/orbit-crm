@@ -17,6 +17,7 @@ const handleResponse = (res) => ({
 // --- CONTACTS ---
 
 export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50, search = '', callStatus = '', orderBy = 'created_at' }) => {
+  console.log("getContacts called with:", { businessId, page, pageSize, search });
   const uid = await getUid();
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -34,8 +35,10 @@ export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50,
   query = query.order(orderBy, { ascending: false }).range(from, to);
 
   console.log("Before getContacts query", { businessId, listId });
+  const timeout = setTimeout(() => console.error("getContacts timed out after 10s"), 10000);
   const res = await query;
-  console.log("After getContacts query:", res);
+  clearTimeout(timeout);
+  console.log("getContacts result:", res.data?.length, "rows, error:", res.error);
 
   return handleResponse(res);
 };

@@ -3150,7 +3150,9 @@ function ImportWizard({ cx, lk, preList, onClose }) {
     const { news, updates, rejected } = preparedRef.current;
     const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listIds: [listId], importId: impId }));
     // Insert via Supabase batch API
-    await dbApi.batchImportContacts(newContacts);
+    console.log("Contacts to import:", newContacts.length, newContacts[0]);
+    const result = await dbApi.batchImportContacts(newContacts);
+    console.log("Import result:", result);
     if (updates.length) {
       const upById = new Map(updates.map(u => [u.id, u]));
       cx.bulkUpdate(new Set(updates.map(u => u.id)), (c) => {

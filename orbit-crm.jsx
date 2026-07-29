@@ -2690,7 +2690,7 @@ function stripDerived(c) { const { _s, ...rest } = c; return rest; }
 
 function useContacts(db, update, toast) {
   const [cdb, setCdb] = useState(null);
-  const [contacts, setContacts] = useState(null);
+  const [contacts, setContacts] = useState([]);
   const [cloaded, setCloaded] = useState(false);
   const [storageWarn, setStorageWarn] = useState(false);
   const prevShards = useRef(0);

@@ -2706,7 +2706,8 @@ function useContacts(db, update, toast) {
       imports: db?.imports || [],
       folders: db?.folders || [],
       lists: db?.lists || [],
-      customOutcomes: db?.customOutcomes || []
+      customOutcomes: db?.customOutcomes || [],
+      settings: { columns: ["company", "name", "phone", "industry", "location", "list", "callStatus", "attempts", "lastOutcome", "nextCall", "priority"], ...(db?.settings || {}) }
     };
     setCdb(meta); 
     if (db) setCloaded(true);

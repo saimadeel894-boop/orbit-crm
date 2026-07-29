@@ -3145,13 +3145,12 @@ function ImportWizard({ cx, lk, preList, onClose }) {
     setBusy("Importing…"); setProgress(0);
     const impId = uid("imp");
     let listId = ctx.target;
-    if (ctx.target === "new") { const nl = cx.createList({ name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), businessId: ctx.businessId, industry: ctx.industry, subIndustry: ctx.subIndustry, source: ctx.source, status: "Active" }); listId = nl.id; }
+    if (ctx.target === "new") { const nl = await dbApi.createLeadList({ name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), businessId: ctx.businessId, industry: ctx.industry, subIndustry: ctx.subIndustry, source: ctx.source, status: "Active" }); listId = nl.id; }
     else cx.updateList(listId, { status: "Active", lastActivity: nowISO() });
     const { news, updates, rejected } = preparedRef.current;
     const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listIds: [listId], importId: impId }));
     // Insert via Supabase batch API
     await dbApi.batchImportContacts(newContacts);
-    cx.addContacts(newContacts); // also add to local memory to avoid waiting for reload
     if (updates.length) {
       const upById = new Map(updates.map(u => [u.id, u]));
       cx.bulkUpdate(new Set(updates.map(u => u.id)), (c) => {
@@ -3167,6 +3166,7 @@ function ImportWizard({ cx, lk, preList, onClose }) {
       total: total, imported: newContacts.length, updated: updates.length, duplicates: stats.duplicates, rejected: rejected.length,
       status: "Complete", by: "You", mapping, rejectedRows: rejected.slice(0, 5000) });
     setBusy(""); setStep(3);
+    window.location.reload();
   };
 
   const downloadRejected = () => {

@@ -30,7 +30,6 @@ export const mapContactToLocal = (s) => ({
 });
 
 export const mapContactToSupabase = (l, userId) => ({
-  id: l.id,
   business_id: l.businessId || null,
   name: l.contactName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Unknown',
   email: l.email || null,

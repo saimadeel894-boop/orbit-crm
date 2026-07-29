@@ -65,7 +65,11 @@ export const batchImportContacts = async (rows) => {
     const chunk = rows.slice(i, i + chunkSize).map(r => mapContactToSupabase(r, uid));
     const { data, error } = await supabase.from('contacts').insert(chunk).select(); // Supabase ignores duplicates if unique constraints are set, or we can use upsert
     console.log("Supabase insert response:", data, error);
-    if (error) { allError = error; break; }
+    if (error) {
+      console.error("Supabase insert error:", JSON.stringify(error));
+      allError = error;
+      break;
+    }
     if (data) allData = [...allData, ...data];
   }
   return { data: allData, error: allError, count: allData.length };
@@ -244,4 +248,18 @@ export const exportContacts = async (businessId) => {
 
   // No pagination, full export
   return handleResponse(await query);
+};
+
+export const createLeadList = async (data) => {
+  const uid = await getUid();
+  const payload = {
+    name: data.name,
+    business_id: data.businessId || null,
+    industry: data.industry || null,
+    sub_industry: data.subIndustry || null,
+    source: data.source || null,
+    status: data.status || 'Active',
+    user_id: uid
+  };
+  return handleResponse(await supabase.from('lead_lists').insert(payload).select().single());
 };

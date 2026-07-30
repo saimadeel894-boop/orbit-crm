@@ -43,6 +43,11 @@ export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50,
   return handleResponse(res);
 };
 
+export const getContactById = async (id) => {
+  const uid = await getUid();
+  return handleResponse(await supabase.from('contacts').select('*').eq('id', id).eq('user_id', uid).single());
+};
+
 export const createContact = async (data) => {
   const uid = await getUid();
   return handleResponse(await supabase.from('contacts').insert({ ...data, user_id: uid }).select().single());
@@ -265,4 +270,9 @@ export const createLeadList = async (data) => {
     user_id: uid
   };
   return handleResponse(await supabase.from('lead_lists').insert(payload).select().single());
+};
+
+export const getAllQueueContacts = async () => {
+  const uid = await getUid();
+  return handleResponse(await supabase.from('contacts').select('id, business_id, industry, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at, archived').eq('user_id', uid));
 };

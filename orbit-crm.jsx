@@ -778,7 +778,14 @@ function LeadForm({ initial, db, onSave, onClose, toast }) {
 
   const save = () => {
     if (!d.contactName && !d.company) { toast("Add a contact name or company first", "warn"); return; }
-    onSave(d);
+    onSave({
+      ...d,
+      dealValue: Number(d.dealValue) || 0,
+      oneOff: Number(d.oneOff) || 0,
+      mrr: Number(d.mrr) || 0,
+      probability: Number(d.probability) || 0,
+      tags: typeof d.tags === "string" ? d.tags.split(",").map(t => t.trim()).filter(Boolean) : d.tags
+    });
   };
 
   return (
@@ -795,7 +802,7 @@ function LeadForm({ initial, db, onSave, onClose, toast }) {
         {dupes.length > 0 && (
           <div style={{ background: "color-mix(in srgb, var(--warn) 12%, transparent)", border: "1px solid var(--warn)",
             borderRadius: 10, padding: "10px 12px", marginBottom: 16, fontSize: 12.5, color: "var(--ink-2)" }}>
-            <b style={{ color: "var(--warn)" }}><AlertTriangle size={13} style={{ verticalAlign: -2 }} /> Possible duplicate</b> — matches {dupes.map(x => x.contactName || x.company).join(", ")}. Save anyway or close and open the existing record.
+            <b style={{ color: "var(--warn)" }}><AlertTriangle size={13} style={{ verticalAlign: -2 }} /> Possible duplicate</b> ?" matches {dupes.map(x => x.contactName || x.company).join(", ")}. Save anyway or close and open the existing record.
           </div>
         )}
         <div className="form-grid">
@@ -806,7 +813,7 @@ function LeadForm({ initial, db, onSave, onClose, toast }) {
           <Field label="Phone"><Input value={d.phone} onChange={e => set("phone", e.target.value)} placeholder="04xx xxx xxx" /></Field>
           <Field label="Location"><Input value={d.location} onChange={e => set("location", e.target.value)} placeholder="Melbourne, VIC" /></Field>
           <Field label="Website"><Input value={d.website} onChange={e => set("website", e.target.value)} placeholder="acme.com.au" /></Field>
-          <Field label="LinkedIn"><Input value={d.linkedin} onChange={e => set("linkedin", e.target.value)} placeholder="linkedin.com/in/…" /></Field>
+          <Field label="LinkedIn"><Input value={d.linkedin} onChange={e => set("linkedin", e.target.value)} placeholder="linkedin.com/in/?" /></Field>
 
           <SubHead>Assignment</SubHead>
           <Field label="Business / brand">
@@ -841,20 +848,20 @@ function LeadForm({ initial, db, onSave, onClose, toast }) {
           </Field>
 
           <SubHead>Deal</SubHead>
-          <Field label="Estimated deal value" hint="AUD"><Input type="number" value={d.dealValue} onChange={e => set("dealValue", Number(e.target.value))} /></Field>
-          <Field label="Probability of closing" hint="%"><Input type="number" min="0" max="100" value={d.probability} onChange={e => set("probability", Number(e.target.value))} /></Field>
-          <Field label="One-off revenue"><Input type="number" value={d.oneOff} onChange={e => set("oneOff", Number(e.target.value))} /></Field>
-          <Field label="Monthly recurring (MRR)"><Input type="number" value={d.mrr} onChange={e => set("mrr", Number(e.target.value))} /></Field>
+          <Field label="Estimated deal value" hint="AUD"><Input type="number" value={d.dealValue} onChange={e => set("dealValue", e.target.value)} /></Field>
+          <Field label="Probability of closing" hint="%"><Input type="number" min="0" max="100" value={d.probability} onChange={e => set("probability", e.target.value)} /></Field>
+          <Field label="One-off revenue"><Input type="number" value={d.oneOff} onChange={e => set("oneOff", e.target.value)} /></Field>
+          <Field label="Monthly recurring (MRR)"><Input type="number" value={d.mrr} onChange={e => set("mrr", e.target.value)} /></Field>
           <Field label="Expected decision date"><Input type="date" value={d.expectedDecisionDate} onChange={e => set("expectedDecisionDate", e.target.value)} /></Field>
           <Field label="Next follow-up"><Input type="date" value={d.nextFollowUp} onChange={e => set("nextFollowUp", e.target.value)} /></Field>
 
           <SubHead>Context</SubHead>
-          <Field label="Services they're interested in" full><Input value={d.services} onChange={e => set("services", e.target.value)} placeholder="AI receptionist, website rebuild…" /></Field>
+          <Field label="Services they're interested in" full><Input value={d.services} onChange={e => set("services", e.target.value)} placeholder="AI receptionist, website rebuild?" /></Field>
           <Field label="Main pain points" full><Textarea value={d.painPoints} onChange={e => set("painPoints", e.target.value)} placeholder="What's driving the conversation?" /></Field>
-          <Field label="Current systems / software"><Input value={d.currentSystems} onChange={e => set("currentSystems", e.target.value)} placeholder="Cliniko, MYOB…" /></Field>
+          <Field label="Current systems / software"><Input value={d.currentSystems} onChange={e => set("currentSystems", e.target.value)} placeholder="Cliniko, MYOB?" /></Field>
           <Field label="Competitors being considered"><Input value={d.competitors} onChange={e => set("competitors", e.target.value)} /></Field>
           <Field label="Tags" hint="comma separated" full>
-            <Input value={(d.tags || []).join(", ")} onChange={e => set("tags", e.target.value.split(",").map(t => t.trim()).filter(Boolean))} placeholder="ndis, hot, referral" />
+            <Input value={Array.isArray(d.tags) ? d.tags.join(", ") : (d.tags || "")} onChange={e => set("tags", e.target.value)} placeholder="ndis, hot, referral" />
           </Field>
         </div>
       </div>
@@ -2879,6 +2886,22 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
   const { cdb, contacts } = cx;
   const [newList, setNewList] = useState(null);
   const [newFolder, setNewFolder] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [errorState, setErrorState] = useState(null);
+
+  useEffect(() => {
+    if (cdb.lists && cdb.lists.length > 0) {
+      setLoading(false);
+      setErrorState(null);
+    } else {
+      const timer = setTimeout(() => {
+        setLoading(false);
+        setErrorState("No lists found. Import a CSV to create a list.");
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [cdb.lists]);
+
   const foldered = { "": [] };
   cdb.folders.forEach(f => foldered[f.id] = []);
   cdb.lists.forEach(l => { (foldered[l.folderId] || foldered[""]).push(l); });
@@ -2931,8 +2954,9 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
         <span style={{ fontSize: 12, color: "var(--muted)" }}>{contacts.length.toLocaleString()} contacts · {cdb.lists.length} lists</span>
       </div>
 
-      {cdb.lists.length === 0 && <Empty icon={Database} title="No contact lists yet" sub="Import a CSV or XLSX to build your first calling list." action={<button className="btn btn-primary" onClick={onImport}><Upload size={15} />Import contacts</button>} />}
-
+      {loading && <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading lists...</div>}
+      {errorState && <Empty icon={Database} title="No lists found" sub="Import a CSV to create a list." action={<button className="btn btn-primary" onClick={onImport}><Upload size={15} />Import contacts</button>} />}
+      {!loading && !errorState && cdb.lists.length === 0 && <Empty icon={Database} title="No contact lists yet" sub="Import a CSV or XLSX to build your first calling list." action={<button className="btn btn-primary" onClick={onImport}><Upload size={15} />Import contacts</button>} />}
       {Object.entries(foldered).map(([fid, lists]) => {
         if (!lists.length) return null;
         const folder = cdb.folders.find(f => f.id === fid);
@@ -3075,7 +3099,7 @@ function ImportWizard({ cx, lk, preList, onClose }) {
   const [headers, setHeaders] = useState([]);
   const [preview, setPreview] = useState([]);
   const [mapping, setMapping] = useState({});
-  const [ctx, setCtx] = useState({ target: preList || "new", newName: "", businessId: "b_23labs", industry: "", subIndustry: "", source: "Lead list" });
+  const [ctx, setCtx] = useState({ target: preList || "new", newName: "", businessId: lk.businesses[0]?.id || "b_23labs", industry: "", subIndustry: "", source: "Lead list" });
   const [dupPolicy, setDupPolicy] = useState("skip");
   const [busy, setBusy] = useState("");
   const [progress, setProgress] = useState(0);
@@ -3149,9 +3173,9 @@ function ImportWizard({ cx, lk, preList, onClose }) {
     if (ctx.target === "new") { const nl = await dbApi.createLeadList({ name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), businessId: ctx.businessId, industry: ctx.industry, subIndustry: ctx.subIndustry, source: ctx.source, status: "Active" }); listId = nl.id; }
     else cx.updateList(listId, { status: "Active", lastActivity: nowISO() });
     const { news, updates, rejected } = preparedRef.current;
-    const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listIds: [listId], importId: impId }));
+    const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listId: listId, listIds: [listId], importId: impId }));
     // Insert via Supabase batch API
-    console.log("Contacts to import:", newContacts.length, newContacts[0]);
+    console.log("Contacts to import, listId:", listId, newContacts.length, newContacts[0]);
     const result = await dbApi.batchImportContacts(newContacts);
     console.log("Import result:", result);
     if (updates.length) {
@@ -3254,7 +3278,7 @@ function ImportWizard({ cx, lk, preList, onClose }) {
                   </Select>
                 </Field>
                 {ctx.target === "new" && <Field label="New list name"><Input value={ctx.newName} onChange={e => setCtx(c => ({ ...c, newName: e.target.value }))} placeholder={file ? file.name.replace(/\.[^.]+$/, "") : "Imported list"} /></Field>}
-                <Field label="Business"><Select value={ctx.businessId} onChange={e => setCtx(c => ({ ...c, businessId: e.target.value }))}><option value="b_23labs">23Labs</option><option value="b_haylo">Haylo</option></Select></Field>
+                <Field label="Business"><Select value={ctx.businessId} onChange={e => setCtx(c => ({ ...c, businessId: e.target.value }))}>{lk.businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></Field>
                 <Field label="Default industry"><Input value={ctx.industry} onChange={e => setCtx(c => ({ ...c, industry: e.target.value }))} placeholder="Used when a row has none" /></Field>
               </div>
             </div>
@@ -3748,7 +3772,7 @@ function buildQueue(contacts, spec) {
 }
 
 function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
-  const { cdb, contacts } = cx;
+  const { cdb } = cx;
   const [ids, setIds] = useState([]);
   const [idx, setIdx] = useState(0);
   const [running, setRunning] = useState(false);
@@ -3757,14 +3781,52 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
   const [session, setSession] = useState({ logged: 0, reached: 0 });
   const [b, setB] = useState({ source: "list", listId: cdb.lists[0]?.id || "", outcome: "No Answer" });
 
-  const begin = (spec) => { const q = buildQueue(contacts, spec); setIds(q); setIdx(0); setRunning(true); setSession({ logged: 0, reached: 0 }); };
-  useEffect(() => { if (startSpec) { begin(startSpec); clearSpec && clearSpec(); } /* eslint-disable-next-line */ }, [startSpec]);
+  const [poolContacts, setPoolContacts] = useState([]);
+  const [loadingPool, setLoadingPool] = useState(true);
+  const [poolError, setPoolError] = useState(null);
+  const [currentContact, setCurrentContact] = useState(null);
 
-  const current = running && idx < ids.length ? contacts.find(c => c.id === ids[idx]) : null;
+  useEffect(() => {
+    setLoadingPool(true);
+    setPoolError(null);
+    const fetchPromise = dbApi.getAllQueueContacts();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load queue data. Please refresh.")), 5000));
+    Promise.race([fetchPromise, timeoutPromise]).then(res => {
+      if (res.error) setPoolError(res.error.message || "Unknown error");
+      else if (res.data) setPoolContacts(res.data.map(mapContactToLocal));
+    }).catch(e => {
+      setPoolError(e.message || "Failed to load. Please refresh.");
+    }).finally(() => {
+      setLoadingPool(false);
+    });
+  }, []);
+
+  const begin = (spec) => { const q = buildQueue(poolContacts, spec); setIds(q); setIdx(0); setRunning(true); setSession({ logged: 0, reached: 0 }); };
+  useEffect(() => { if (startSpec && poolContacts.length) { begin(startSpec); clearSpec && clearSpec(); } /* eslint-disable-next-line */ }, [startSpec, poolContacts.length]);
+
+  useEffect(() => {
+    if (running && idx < ids.length) {
+      setCurrentContact(null); // Clear while loading
+      Promise.all([
+        dbApi.getContactById(ids[idx]),
+        dbApi.getActivity(ids[idx])
+      ]).then(([cRes, aRes]) => {
+        if (cRes.data) {
+          const c = mapContactToLocal(cRes.data);
+          c.activity = aRes.data ? aRes.data.map(mapActivityToLocal) : [];
+          setCurrentContact(c);
+        }
+      });
+    }
+  }, [running, idx, ids]);
+
   const advance = () => { setLogging(false); setNote(""); setIdx(i => i + 1); };
   const onLogged = () => { setSession(s => ({ logged: s.logged + 1, reached: s.reached })); advance(); };
 
   if (!running) {
+    if (loadingPool) return <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading queue data...</div>;
+    if (poolError) return <div style={{ padding: "20px 0", color: "var(--red)" }}>{poolError}</div>;
+
     return (
       <div style={{ maxWidth: 640 }}>
         <div className="card card-pad">
@@ -3790,7 +3852,7 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
                 : b.source === "outcome" ? { type: "outcome", outcome: b.outcome }
                 : b.source === "filter_notcalled" ? { type: "filter", f: { neverCalled: true } }
                 : { type: "filter", f: { notContactedDays: 14 } };
-              const preview = buildQueue(contacts, spec).length;
+              const preview = buildQueue(poolContacts, spec).length;
               return <button className="btn btn-primary" disabled={!preview} onClick={() => begin(spec)}><Play size={15} />Start calling {preview.toLocaleString()} contact{preview !== 1 ? "s" : ""}</button>;
             })()}
           </div>
@@ -3810,7 +3872,10 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
     );
   }
 
-  const c = current;
+  const c = currentContact;
+  if (!c) {
+    return <div style={{ maxWidth: 760, margin: "40px auto", textAlign: "center", color: "var(--muted)" }}>Loading contact details...</div>;
+  }
   const acts = [...(c.activity || [])].reverse().slice(0, 4);
   return (
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
@@ -3880,20 +3945,31 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
   const [cold, setCold] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [errorState, setErrorState] = useState(null);
 
   const loadCold = useCallback(async () => {
     setLoading(true);
-    const { data, count, error } = await dbApi.getColdContacts({
-      businessId: f.business,
-      search: dq,
-      page: page + 1,
-      pageSize
-    });
-    if (!error && data) {
-      setCold(data.map(mapContactToLocal));
-      setTotalCount(count || 0);
+    setErrorState(null);
+    try {
+      const fetchPromise = dbApi.getColdContacts({
+        businessId: f.business,
+        search: dq,
+        page: page + 1,
+        pageSize
+      });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load. Please refresh.")), 5000));
+      const { data, count, error } = await Promise.race([fetchPromise, timeoutPromise]);
+      if (error) {
+        setErrorState(error.message || "Unknown error occurred");
+      } else if (data) {
+        setCold(data.map(mapContactToLocal));
+        setTotalCount(count || 0);
+      }
+    } catch (e) {
+      setErrorState(e.message || "Failed to load. Please refresh.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [f.business, dq, page, pageSize, refresh]);
 
   useEffect(() => { loadCold(); }, [loadCold]);
@@ -3932,8 +4008,9 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
         <button className="btn btn-sm" onClick={() => onExport(cold, "cold")}><Download size={14} />Export</button>
       </div>
 
-      {loading && <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading cold contacts...</div>}
-      {!loading && <div className="dtable-wrap" style={{ maxHeight: "56vh" }}>
+      {errorState && <div style={{ padding: "20px 0", color: "var(--red)" }}>{errorState}</div>}
+      {loading && !errorState && <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading cold contacts...</div>}
+      {!loading && !errorState && <div className="dtable-wrap" style={{ maxHeight: "56vh" }}>
         <table className="dtable">
           <thead><tr>
             <th style={{ width: 34 }}><input type="checkbox" className="ck" checked={allSel} onChange={toggleAll} /></th>
@@ -3982,10 +4059,23 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
 
 /* ============================ Cold + calling dashboard ============================ */
 function ColdDashboard({ cx, lk }) {
-  const { cdb, contacts } = cx;
+  const { cdb } = cx;
   const [biz, setBiz] = useState("all");
+  const [dashboardContacts, setDashboardContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorState, setErrorState] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    dbApi.getAllQueueContacts().then(res => {
+      if (res.error) setErrorState(res.error.message);
+      else if (res.data) setDashboardContacts(res.data.map(mapContactToLocal));
+      setLoading(false);
+    });
+  }, []);
+
   const m = useMemo(() => {
-    const scoped = contacts.filter(c => biz === "all" || c.businessId === biz);
+    const scoped = dashboardContacts.filter(c => biz === "all" || c.businessId === biz);
     let callsToday = 0, callsWeek = 0, attempts = 0, reached = 0;
     for (const c of scoped) { attempts += c.attempts || 0; reached += c.conversations || 0; for (const a of (c.activity || [])) { if (!a.attempt) continue; const d = daysAgo(a.date); if (d === 0) callsToday++; if (d != null && d <= 7) callsWeek++; } }
     const cold = scoped.filter(isColdContact);
@@ -4009,14 +4099,14 @@ function ColdDashboard({ cx, lk }) {
       notInt: by(c => c.callStatus === "Not Interested"),
       invalid: by(c => c.callStatus === "Invalid Contact"),
     };
-  }, [contacts, biz, cdb.lists]);
+  }, [dashboardContacts, biz, cdb.lists]);
 
-  const byList = cdb.lists.map(l => { const s = listStats(contacts, l.id); return { name: l.name, pct: s.total ? Math.round(s.attempted / s.total * 100) : 0, total: s.total }; }).filter(x => x.total).slice(0, 8);
+  const byList = cdb.lists.map(l => { const s = listStats(dashboardContacts, l.id); return { name: l.name, pct: s.total ? Math.round(s.attempted / s.total * 100) : 0, total: s.total }; }).filter(x => x.total).slice(0, 8);
   const byIndustry = useMemo(() => {
     const map = {};
-    for (const c of contacts) { if (biz !== "all" && c.businessId !== biz) continue; const k = c.industry || "Other"; (map[k] = map[k] || { total: 0, done: 0 }); map[k].total++; if ((c.attempts || 0) > 0) map[k].done++; }
+    for (const c of dashboardContacts) { if (biz !== "all" && c.businessId !== biz) continue; const k = c.industry || "Other"; (map[k] = map[k] || { total: 0, done: 0 }); map[k].total++; if ((c.attempts || 0) > 0) map[k].done++; }
     return Object.entries(map).map(([name, v]) => ({ name, pct: Math.round(v.done / v.total * 100), total: v.total })).sort((a, b) => b.total - a.total).slice(0, 8);
-  }, [contacts, biz]);
+  }, [dashboardContacts, biz]);
 
   const Bar = ({ name, pct, total }) => (
     <div style={{ marginBottom: 10 }}>
@@ -4030,6 +4120,11 @@ function ColdDashboard({ cx, lk }) {
       <div className="toolbar"><span style={{ fontSize: 13, color: "var(--muted)" }}>Business</span>
         <Select style={{ width: 140 }} value={biz} onChange={e => setBiz(e.target.value)}><option value="all">All</option><option value="b_23labs">23Labs</option><option value="b_haylo">Haylo</option></Select>
       </div>
+
+      {loading && <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading dashboard data...</div>}
+      {errorState && <div style={{ padding: "20px 0", color: "var(--red)" }}>{errorState}</div>}
+      
+      {!loading && !errorState && <>
       <SubHead>Cold pipeline</SubHead>
       <div className="cc-stats" style={{ marginTop: 10 }}>
         <CTile label="Total in Cold" value={m.coldTotal.toLocaleString()} />
@@ -4059,6 +4154,7 @@ function ColdDashboard({ cx, lk }) {
         <div className="card card-pad"><SubHead>Progress by list</SubHead><div style={{ marginTop: 12 }}>{byList.length ? byList.map(x => <Bar key={x.name} {...x} />) : <div style={{ fontSize: 13, color: "var(--muted)" }}>No lists yet.</div>}</div></div>
         <div className="card card-pad"><SubHead>Progress by industry</SubHead><div style={{ marginTop: 12 }}>{byIndustry.length ? byIndustry.map(x => <Bar key={x.name} {...x} />) : <div style={{ fontSize: 13, color: "var(--muted)" }}>No data yet.</div>}</div></div>
       </div>
+      </>}
     </div>
   );
 }

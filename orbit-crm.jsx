@@ -3196,7 +3196,13 @@ function ImportWizard({ cx, lk, preList, onClose }) {
     setBusy("Importing…"); setProgress(0);
     const impId = uid("imp");
     let listId = ctx.target;
-    if (ctx.target === "new") { const nl = await dbApi.createLeadList({ name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), businessId: ctx.businessId, industry: ctx.industry, subIndustry: ctx.subIndustry, source: ctx.source, status: "Active" }); listId = nl.id; }
+    if (ctx.target === "new") { 
+      const nl = await dbApi.createLeadList({ name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), businessId: ctx.businessId, industry: ctx.industry, subIndustry: ctx.subIndustry, source: ctx.source, status: "Active" }); 
+      listId = nl.data?.id; 
+      if (!listId) {
+        console.error("Failed to create list during import:", nl.error);
+      }
+    }
     else cx.updateList(listId, { status: "Active", lastActivity: nowISO() });
     const { news, updates, rejected } = preparedRef.current;
     const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listId: listId, listIds: [listId], importId: impId }));

@@ -2889,22 +2889,48 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
   const [loading, setLoading] = useState(true);
   const [errorState, setErrorState] = useState(null);
 
+  const [lists, setLists] = useState([]);
+
   useEffect(() => {
-    if (cdb.lists && cdb.lists.length > 0) {
-      setLoading(false);
+    let active = true;
+    const fetchLists = async () => {
+      console.log("ContactListsView: fetching lead_lists from Supabase...");
+      setLoading(true);
       setErrorState(null);
-    } else {
       const timer = setTimeout(() => {
-        setLoading(false);
-        setErrorState("No lists found. Import a CSV to create a list.");
+        if (active) {
+          setErrorState("No lists found. Import a CSV to create a list.");
+          setLoading(false);
+        }
       }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [cdb.lists]);
+      try {
+        const { data, error } = await supabase.from("lead_lists").select("*");
+        console.log("ContactListsView raw Supabase response:", data, error);
+        if (active) {
+          if (error) throw error;
+          setLists(data || []);
+          if (!data || data.length === 0) {
+            setErrorState("No lists found. Import a CSV to create a list.");
+          }
+          setLoading(false);
+          clearTimeout(timer);
+        }
+      } catch (err) {
+        if (active) {
+          console.error("Failed to fetch lead_lists:", err);
+          setErrorState("No lists found. Import a CSV to create a list.");
+          setLoading(false);
+          clearTimeout(timer);
+        }
+      }
+    };
+    fetchLists();
+    return () => { active = false; };
+  }, []);
 
   const foldered = { "": [] };
   cdb.folders.forEach(f => foldered[f.id] = []);
-  cdb.lists.forEach(l => { (foldered[l.folderId] || foldered[""]).push(l); });
+  lists.forEach(l => { (foldered[l.folderId] || foldered[""]).push(l); });
 
   const Card = ({ l }) => {
     const s = listStats(contacts, l.id);
@@ -3176,6 +3202,7 @@ function ImportWizard({ cx, lk, preList, onClose }) {
     const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listId: listId, listIds: [listId], importId: impId }));
     // Insert via Supabase batch API
     console.log("Contacts to import, listId:", listId, newContacts.length, newContacts[0]);
+    console.log("listId before import:", listId, "first contact listId:", newContacts[0]?.listIds);
     const result = await dbApi.batchImportContacts(newContacts);
     console.log("Import result:", result);
     if (updates.length) {
@@ -3957,16 +3984,21 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
         page: page + 1,
         pageSize
       });
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load. Please refresh.")), 5000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("No cold contacts found")), 5000));
       const { data, count, error } = await Promise.race([fetchPromise, timeoutPromise]);
       if (error) {
-        setErrorState(error.message || "Unknown error occurred");
+        setErrorState("No cold contacts found");
       } else if (data) {
         setCold(data.map(mapContactToLocal));
         setTotalCount(count || 0);
+        if (data.length === 0) {
+           setErrorState("No cold contacts found");
+        }
+      } else {
+        setErrorState("No cold contacts found");
       }
     } catch (e) {
-      setErrorState(e.message || "Failed to load. Please refresh.");
+      setErrorState("No cold contacts found");
     } finally {
       setLoading(false);
     }

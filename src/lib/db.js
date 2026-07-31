@@ -283,5 +283,5 @@ export const createLeadList = async (data) => {
 
 export const getAllQueueContacts = async () => {
   const uid = await getUid();
-  return handleResponse(await supabase.from('contacts').select('id, business_id, industry_id, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at, archived').eq('user_id', uid));
+  return handleResponse(await supabase.from('contacts').select('id, business_id, industry_id, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at').eq('user_id', uid));
 };

@@ -3043,7 +3043,7 @@ async function parseHeaders(file) {
     const wb = XLSX.read(buf, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
-    const headers = (rows[0] || []).map(h => String(h).trim());
+    const headers = (rows?.[0] || []).map(h => String(h).trim());
     const preview = rows.slice(1, 9).map(r => { const o = {}; headers.forEach((h, i) => o[h] = r[i] ?? ""); return o; });
     return { headers, preview, kind: "xlsx" };
   }
@@ -3141,7 +3141,7 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
   const [headers, setHeaders] = useState([]);
   const [preview, setPreview] = useState([]);
   const [mapping, setMapping] = useState({});
-  const [ctx, setCtx] = useState({ target: preList || "new", newName: "", businessId: lk.businesses[0]?.id || "b_23labs", industry: "", subIndustry: "", source: "Lead list" });
+  const [ctx, setCtx] = useState({ target: preList || "new", newName: "", businessId: lk?.businesses?.[0]?.id || "b_23labs", industry: "", subIndustry: "", source: "Lead list" });
   const [dupPolicy, setDupPolicy] = useState("skip");
   const [busy, setBusy] = useState("");
   const [progress, setProgress] = useState(0);
@@ -3268,7 +3268,7 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
             <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>CSV is fastest and most reliable for large lists. XLSX is supported too. Files with 50,000+ rows are processed in the background so the workspace stays usable.</p>
             <label className="btn btn-primary" style={{ marginTop: 10, cursor: "pointer" }}>
               <FileUp size={15} />Select CSV or XLSX
-              <input type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={e => pickFile(e.target.files[0])} />
+              <input type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={e => pickFile(e.target.files?.[0])} />
             </label>
             {busy && <div style={{ marginTop: 12, fontSize: 13, color: "var(--muted)" }}>{busy}</div>}
             <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid var(--line)" }}>

@@ -1,8 +1,8 @@
 export const mapContactToLocal = (s) => ({
   id: s.id,
   businessId: s.business_id,
-  firstName: s.name?.split(' ')[0] || '',
-  lastName: s.name?.split(' ').slice(1).join(' ') || '',
+  firstName: (s.name || '').split(' ')[0] || '',
+  lastName: (s.name || '').split(' ').slice(1).join(' ') || '',
   company: s.company || '',
   email: s.email || '',
   phone: s.phone || '',

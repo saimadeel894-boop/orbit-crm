@@ -3834,6 +3834,7 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
   const [loadingPool, setLoadingPool] = useState(true);
   const [poolError, setPoolError] = useState(null);
   const [currentContact, setCurrentContact] = useState(null);
+  const [queueFetchError, setQueueFetchError] = useState(null);
 
   useEffect(() => {
     setLoadingPool(true);
@@ -3850,21 +3851,35 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
     });
   }, []);
 
-  const begin = (spec) => { const q = buildQueue(poolContacts, spec); setIds(q); setIdx(0); setRunning(true); setSession({ logged: 0, reached: 0 }); };
+  const begin = (spec) => { const q = buildQueue(poolContacts, spec); setIds(q); setIdx(0); setRunning(true); setSession({ logged: 0, reached: 0 }); setQueueFetchError(null); };
   useEffect(() => { if (startSpec && poolContacts.length) { begin(startSpec); clearSpec && clearSpec(); } /* eslint-disable-next-line */ }, [startSpec, poolContacts.length]);
 
   useEffect(() => {
     if (running && idx < ids.length) {
       setCurrentContact(null); // Clear while loading
+      setQueueFetchError(null);
       Promise.all([
         dbApi.getContactById(ids[idx]),
         dbApi.getActivity(ids[idx])
       ]).then(([cRes, aRes]) => {
-        if (cRes.data) {
-          const c = mapContactToLocal(cRes.data);
-          c.activity = aRes.data ? aRes.data.map(mapActivityToLocal) : [];
-          setCurrentContact(c);
+        if (cRes.error) {
+          console.error("Queue contact fetch error:", cRes.error);
+          setQueueFetchError(cRes.error.message || JSON.stringify(cRes.error));
+        } else if (cRes.data) {
+          try {
+            const c = mapContactToLocal(cRes.data);
+            c.activity = aRes.data ? aRes.data.map(mapActivityToLocal) : [];
+            setCurrentContact(c);
+          } catch (e) {
+            console.error("Mapping error:", e);
+            setQueueFetchError(e.message);
+          }
+        } else {
+          setQueueFetchError("Contact not found");
         }
+      }).catch(e => {
+        console.error("Promise.all error:", e);
+        setQueueFetchError(e.message);
       });
     }
   }, [running, idx, ids]);
@@ -3922,6 +3937,9 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
   }
 
   const c = currentContact;
+  if (queueFetchError) {
+    return <div style={{ maxWidth: 760, margin: "40px auto", textAlign: "center", color: "var(--red)" }}>Error loading contact: {queueFetchError}</div>;
+  }
   if (!c) {
     return <div style={{ maxWidth: 760, margin: "40px auto", textAlign: "center", color: "var(--muted)" }}>Loading contact details...</div>;
   }

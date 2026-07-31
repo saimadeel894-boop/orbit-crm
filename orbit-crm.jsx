@@ -2737,8 +2737,18 @@ function useContacts(db, update, toast) {
 
   /* ---- contact ops (no deep clone of the big array) ---- */
   const updateContact = (id, patch, activity) => setContacts(cs => cs.map(c => c.id === id ? recompute({ ...c, ...patch, activity: activity ? [...c.activity, activity] : c.activity, updatedAt: nowISO() }) : c));
-  const bulkUpdate = (ids, fn) => { const set = ids instanceof Set ? ids : new Set(ids); setContacts(cs => cs.map(c => set.has(c.id) ? recompute(fn({ ...c })) : c)); };
-  const bulkDelete = (ids) => { const set = ids instanceof Set ? ids : new Set(ids); setContacts(cs => cs.filter(c => !set.has(c.id))); };
+  const bulkUpdate = async (ids, fn, patch) => { 
+    const set = ids instanceof Set ? ids : new Set(ids); 
+    setContacts(cs => cs.map(c => set.has(c.id) ? recompute(fn({ ...c })) : c)); 
+    if (patch) {
+      await dbApi.bulkUpdateContacts(Array.from(set), patch);
+    }
+  };
+  const bulkDelete = async (ids) => { 
+    const set = ids instanceof Set ? ids : new Set(ids); 
+    setContacts(cs => cs.filter(c => !set.has(c.id))); 
+    await dbApi.bulkDeleteContacts(Array.from(set));
+  };
   const addContacts = (list) => setContacts(cs => [...list, ...cs]);
 
   /* ---- DNC ---- */
@@ -3580,15 +3590,15 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
           <button className="b2" onClick={() => setBulk("business")}><Layers size={13} />Assign</button>
           <button className="b2" onClick={() => setBulk("schedule")}><CalendarClock size={13} />Schedule</button>
           <button className="b2" onClick={() => setBulk("tag")}><Tag size={13} />Tag</button>
-          <button className="b2" onClick={() => { cx.bulkUpdate(selected, c => ({ ...c, archived: true })); setSelected(new Set()); }}><Inbox size={13} />Archive</button>
+          <button className="b2" onClick={() => { cx.bulkUpdate(selected, c => ({ ...c, archived: true }), { archived: true }); setSelected(new Set()); }}><Inbox size={13} />Archive</button>
           <button className="b2" onClick={() => onExport(sorted.filter(c => selected.has(c.id)), "selected")}><Download size={13} />Export</button>
-          <button className="b2" onClick={() => confirm({ title: "Mark as Do Not Contact?", body: selected.size + " contacts will be permanently excluded from all call queues and follow-ups.", danger: true, confirmLabel: "Mark Do Not Contact", onConfirm: () => { selected.forEach(id => cx.markDNC(id)); setSelected(new Set()); } })}><Ban size={13} />Do Not Contact</button>
+          <button className="b2" onClick={() => confirm({ title: "Mark as Do Not Contact?", body: selected.size + " contacts will be permanently excluded from all call queues and follow-ups.", danger: true, confirmLabel: "Mark Do Not Contact", onConfirm: () => { cx.bulkUpdate(selected, c => { cx.registerDNC(c.phone, c.email); return { ...c, callStatus: "Do Not Contact", nextCallDate: "" }; }, { call_status: "Do Not Contact", next_call_date: null }); setSelected(new Set()); } })}><Ban size={13} />Do Not Contact</button>
           <button className="b2" onClick={() => confirm({ title: "Delete contacts?", body: "This permanently removes " + selected.size + " contacts and their call history.", danger: true, confirmLabel: "Delete", onConfirm: () => { cx.bulkDelete(selected); setSelected(new Set()); } })}><Trash2 size={13} />Delete</button>
           <button className="b2" onClick={() => setSelected(new Set())}><X size={13} /></button>
         </div>
       )}
 
-      {bulk && <BulkPrompt kind={bulk} cx={cx} count={selected.size} onClose={() => setBulk(null)} onApply={(fn) => { cx.bulkUpdate(selected, fn); setBulk(null); setSelected(new Set()); }} />}
+      {bulk && <BulkPrompt kind={bulk} cx={cx} count={selected.size} onClose={() => setBulk(null)} onApply={(fn, patch) => { cx.bulkUpdate(selected, fn, patch); setBulk(null); setSelected(new Set()); }} />}
     </div>
   );
 }
@@ -3597,13 +3607,13 @@ function BulkPrompt({ kind, cx, count, onClose, onApply }) {
   const [v, setV] = useState(kind === "priority" ? "High" : kind === "business" ? "b_23labs" : kind === "schedule" ? todayISO() : (kind === "move" || kind === "add") ? (cx.cdb.lists[0]?.id || "") : "");
   const titles = { move: "Move to list", add: "Add to another list", industry: "Change industry", priority: "Change priority", business: "Assign to business", schedule: "Schedule a call date", tag: "Add a tag" };
   const apply = () => {
-    if (kind === "move") onApply(c => ({ ...c, listIds: [v] }));
-    else if (kind === "add") onApply(c => ({ ...c, listIds: c.listIds.includes(v) ? c.listIds : [...c.listIds, v] }));
-    else if (kind === "industry") onApply(c => ({ ...c, industry: v }));
-    else if (kind === "priority") onApply(c => ({ ...c, priority: v }));
-    else if (kind === "business") onApply(c => ({ ...c, businessId: v }));
-    else if (kind === "schedule") onApply(c => ({ ...c, nextCallDate: v, callStatus: c.callStatus === "Cold" ? "Follow Up Required" : c.callStatus }));
-    else if (kind === "tag") onApply(c => ({ ...c, tags: c.tags.includes(v) ? c.tags : [...c.tags, v] }));
+    if (kind === "move") onApply(c => ({ ...c, listIds: [v] }), { lead_list_id: v });
+    else if (kind === "add") onApply(c => ({ ...c, listIds: c.listIds.includes(v) ? c.listIds : [...c.listIds, v] }), { lead_list_id: v });
+    else if (kind === "industry") onApply(c => ({ ...c, industry: v }), null); // complex
+    else if (kind === "priority") onApply(c => ({ ...c, priority: v }), { priority: v });
+    else if (kind === "business") onApply(c => ({ ...c, businessId: v }), { business_id: v });
+    else if (kind === "schedule") onApply(c => ({ ...c, nextCallDate: v, callStatus: c.callStatus === "Cold" ? "Follow Up Required" : c.callStatus }), { next_call_date: v });
+    else if (kind === "tag") onApply(c => ({ ...c, tags: c.tags.includes(v) ? c.tags : [...c.tags, v] }), null);
   };
   return (
     <Modal onClose={onClose}>
@@ -4089,14 +4099,14 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
           <button className="b2" onClick={() => setBulk("priority")}><Flame size={13} />Priority</button>
           <button className="b2" onClick={() => setBulk("add")}><ListChecks size={13} />Add to list</button>
           <button className="b2" onClick={() => onExport(cold.filter(c => selected.has(c.id)), "selected")}><Download size={13} />Export</button>
-          <button className="b2" onClick={() => { cx.bulkUpdate(selected, c => ({ ...c, archived: true })); setSelected(new Set()); }}><Inbox size={13} />Archive</button>
-          <button className="b2" onClick={() => { selected.forEach(id => cx.markInvalid(id)); setSelected(new Set()); }}><CircleSlash size={13} />Invalid</button>
-          <button className="b2" onClick={() => confirm({ title: "Mark Do Not Contact?", body: selected.size + " contacts will be permanently excluded from all outreach.", danger: true, confirmLabel: "Do Not Contact", onConfirm: () => { selected.forEach(id => cx.markDNC(id)); setSelected(new Set()); } })}><Ban size={13} />Do Not Contact</button>
+          <button className="b2" onClick={() => { cx.bulkUpdate(selected, c => ({ ...c, archived: true }), { archived: true }); setSelected(new Set()); }}><Inbox size={13} />Archive</button>
+          <button className="b2" onClick={() => { cx.bulkUpdate(selected, c => ({ ...c, callStatus: "Invalid Contact" }), { call_status: "Invalid Contact" }); setSelected(new Set()); }}><CircleSlash size={13} />Invalid</button>
+          <button className="b2" onClick={() => confirm({ title: "Mark Do Not Contact?", body: selected.size + " contacts will be permanently excluded from all outreach.", danger: true, confirmLabel: "Do Not Contact", onConfirm: () => { cx.bulkUpdate(selected, c => { cx.registerDNC(c.phone, c.email); return { ...c, callStatus: "Do Not Contact", nextCallDate: "" }; }, { call_status: "Do Not Contact", next_call_date: null }); setSelected(new Set()); } })}><Ban size={13} />Do Not Contact</button>
           <button className="b2" onClick={() => confirm({ title: "Convert to leads?", body: selected.size + " contacts will be promoted into the sales pipeline.", confirmLabel: "Convert", onConfirm: () => { selected.forEach(id => cx.convertContact(id)); setSelected(new Set()); } })}><UserPlus size={13} />Convert</button>
           <button className="b2" onClick={() => setSelected(new Set())}><X size={13} /></button>
         </div>
       )}
-      {bulk && <BulkPrompt kind={bulk} cx={cx} count={selected.size} onClose={() => setBulk(null)} onApply={(fn) => { cx.bulkUpdate(selected, fn); setBulk(null); setSelected(new Set()); }} />}
+      {bulk && <BulkPrompt kind={bulk} cx={cx} count={selected.size} onClose={() => setBulk(null)} onApply={(fn, patch) => { cx.bulkUpdate(selected, fn, patch); setBulk(null); setSelected(new Set()); }} />}
     </div>
   );
 }

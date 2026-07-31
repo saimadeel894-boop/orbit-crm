@@ -63,6 +63,16 @@ export const deleteContact = async (id) => {
   return handleResponse(await supabase.from('contacts').delete().eq('id', id).eq('user_id', uid));
 };
 
+export const bulkUpdateContacts = async (ids, patch) => {
+  const uid = await getUid();
+  return handleResponse(await supabase.from('contacts').update(patch).in('id', ids).eq('user_id', uid));
+};
+
+export const bulkDeleteContacts = async (ids) => {
+  const uid = await getUid();
+  return handleResponse(await supabase.from('contacts').delete().in('id', ids).eq('user_id', uid));
+};
+
 export const batchImportContacts = async (rows) => {
   const uid = await getUid();
   const chunkSize = 500;
@@ -263,8 +273,7 @@ export const createLeadList = async (data) => {
   const payload = {
     name: data.name,
     business_id: data.businessId || null,
-    industry: data.industry || null,
-    sub_industry: data.subIndustry || null,
+    industry_id: data.industry || null,
     source: data.source || null,
     status: data.status || 'Active',
     user_id: uid
@@ -274,5 +283,5 @@ export const createLeadList = async (data) => {
 
 export const getAllQueueContacts = async () => {
   const uid = await getUid();
-  return handleResponse(await supabase.from('contacts').select('id, business_id, industry, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at, archived').eq('user_id', uid));
+  return handleResponse(await supabase.from('contacts').select('id, business_id, industry_id, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at, archived').eq('user_id', uid));
 };

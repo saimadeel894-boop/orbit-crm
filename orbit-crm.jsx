@@ -21,7 +21,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "./src/lib/supabase";
 import { getSession, onAuthChange, signOut } from "./src/lib/auth";
 import LoginScreen from "./src/components/LoginScreen";
-import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, mapContactToLocal } from "./src/lib/mappers";
+import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, mapContactToLocal, mapActivityToLocal, mapActivityToSupabase } from "./src/lib/mappers";
 import * as dbApi from "./src/lib/db";
 
 
@@ -2787,7 +2787,7 @@ function useContacts(db, update, toast) {
     let nextCallDate = data.followUpDate || "";
     if (!nextCallDate && meta.rule && meta.rule.days) nextCallDate = addBusinessDays(todayISO(), meta.rule.days);
     const chanType = channel === "Email" ? "email" : channel === "LinkedIn" ? "linkedin" : channel === "Text" ? "text" : "call";
-    const activity = { id: uid("a"), type: chanType, attempt: true, channel, date: nowISO(), outcome: data.outcome || (channel + " sent"), notes: data.notes || "", person: data.person || "", duration: data.duration || "", interest: data.interest || "", nextAction: data.nextAction || "", followUp: nextCallDate };
+    const activity = { id: uid("a"), type: chanType, attempt: true, channel, date: nowISO(), outcome: data.outcome || (channel + " sent"), notes: data.notes || "", person: data.person || "", duration: data.duration || "", interest: data.interest || "", nextAction: data.nextAction || "", followUp: nextCallDate, contactId: id };
     const patch = {
       attempts: (c.attempts || 0) + 1, conversations: (c.conversations || 0) + (meta.reached ? 1 : 0),
       firstCallDate: c.firstCallDate || todayISO(), lastCallDate: todayISO(), lastOutcome: data.outcome,
@@ -2795,6 +2795,13 @@ function useContacts(db, update, toast) {
       phone: data.updPhone || c.phone, email: data.updEmail || c.email,
     };
     updateContact(id, patch, activity);
+    dbApi.updateContact(id, {
+      attempts: patch.attempts, conversations: patch.conversations,
+      first_call_date: patch.firstCallDate, last_call_date: patch.lastCallDate, last_outcome: patch.lastOutcome,
+      call_status: patch.callStatus, next_call_date: patch.nextCallDate, next_call_time: patch.nextCallTime,
+      phone: patch.phone, email: patch.email
+    }).catch(console.error);
+    dbApi.addActivity(id, mapActivityToSupabase(activity)).catch(console.error);
     if (meta.dnc) registerDNC(patch.phone, patch.email);
     // spin off a CRM task/event for information / qualification / demo
     if (meta.rule && (meta.rule.task || meta.rule.event) && nextCallDate) {
@@ -3209,14 +3216,23 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
   };
 
   const doImport = async () => {
-    setBusy("Importing…"); setProgress(0);
+    setBusy("Importing..."); setProgress(0);
     const impId = uid("imp");
     let listId = ctx.target;
     if (ctx.target === "new") { 
-      const nl = await dbApi.createLeadList({ name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), businessId: ctx.businessId, industry: ctx.industry, subIndustry: ctx.subIndustry, source: ctx.source, status: "Active" }); 
+      const listData = { 
+        name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), 
+        business_id: ctx.businessId, 
+        industry: ctx.industry, 
+        source: ctx.source, 
+        status: "Active" 
+      };
+      const nl = await dbApi.createLeadList(listData); 
       listId = nl.data?.id; 
       if (!listId) {
         console.error("Failed to create list during import:", nl.error);
+      } else {
+        cx.createList({ id: listId, name: listData.name, businessId: ctx.businessId, industry: ctx.industry, source: ctx.source, status: "Active" });
       }
     }
     else cx.updateList(listId, { status: "Active", lastActivity: nowISO() });
@@ -3227,6 +3243,9 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
     console.log("listId before import:", listId, "first contact listId:", newContacts[0]?.listIds);
     const result = await dbApi.batchImportContacts(newContacts);
     console.log("Import result:", result);
+    if (result.data) {
+      cx.addContacts(result.data.map(mapContactToLocal));
+    }
     if (updates.length) {
       const upById = new Map(updates.map(u => [u.id, u]));
       cx.bulkUpdate(new Set(updates.map(u => u.id)), (c) => {

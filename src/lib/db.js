@@ -204,10 +204,10 @@ export const getColdContacts = async ({ businessId, page = 1, pageSize = 50, sea
   // The user prompt specifically asked for cold_contacts to have same structure, is_cold boolean
   // Assuming table `cold_contacts` is used here:
   let query = supabase
-    .from('cold_contacts')
+    .from('contacts')
     .select('*', { count: 'exact' })
     .eq('user_id', uid)
-    .eq('is_cold', true);
+    .eq('call_status', 'Cold');
 
   if (businessId && businessId !== 'all') query = query.eq('business_id', businessId);
   if (search) query = query.ilike('name', `%${search}%`);

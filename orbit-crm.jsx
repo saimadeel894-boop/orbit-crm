@@ -2157,7 +2157,13 @@ export default function App() {
   };
 
   const moveStage = async (id, toStage) => {
-    await dbApi.updateLead(id, { stage: toStage, updated_at: nowISO() });
+    const res = await dbApi.updateLead(id, { stage: toStage, updated_at: nowISO() });
+    if (res.error) {
+      console.error("Failed to move stage:", res.error);
+      toast("Failed to move stage: " + (res.error.message || ""), "error");
+      return;
+    }
+    setDb(prev => ({ ...prev, leads: prev.leads.map(l => l.id === id ? { ...l, stage: toStage } : l) }));
     if (["contacted", "qualified", "proposal", "closed"].includes(toStage)) setStagePrompt({ leadId: id, targetStage: toStage });
     else toast("Moved to " + STAGES.find(s => s.key === toStage)?.name);
     setRefresh(r => r + 1);
@@ -2370,7 +2376,7 @@ export default function App() {
                   <>
                     {cx.storageWarn && <div className="warn-banner"><AlertTriangle size={15} />This dataset is large for in-browser storage. Auto-save may be partial — use Settings → Backup, or export, to keep a durable copy.</div>}
                     {nav === "cold" && <ColdView cx={cx} lk={lk} onOpenContact={setOpenContactId} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} />}
-                    {nav === "contact_lists" && <ContactListsView cx={cx} lk={lk} onOpenList={(id) => { setNav("all_contacts"); setListFilter(id); }} onStartQueue={startQueue} onImport={() => setImportOpen(true)} onExportList={(id) => exportContacts(cx.contacts.filter(c => c.listIds.includes(id)), "list")} confirm={askConfirm} />}
+                    {nav === "contact_lists" && <ContactListsView cx={cx} lk={lk} refreshTrigger={refresh} onOpenList={(id) => { setNav("all_contacts"); setListFilter(id); }} onStartQueue={startQueue} onImport={() => setImportOpen(true)} onExportList={(id) => exportContacts(cx.contacts.filter(c => c.listIds.includes(id)), "list")} confirm={askConfirm} />}
                     {nav === "all_contacts" && <AllContactsView cx={cx} lk={lk} initialFilter={listFilter ? { list: listFilter } : null} onOpenContact={setOpenContactId} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} />}
                     {nav === "call_queue" && <CallQueueView cx={cx} lk={lk} startSpec={queueSpec} clearSpec={() => setQueueSpec(null)} confirm={askConfirm} />}
                     {nav === "cold_dashboard" && <ColdDashboard cx={cx} lk={lk} />}
@@ -2401,7 +2407,7 @@ export default function App() {
         })()}
 
         {/* cold-calling overlays */}
-        {importOpen && contactsReady && <ImportWizard cx={cx} lk={lk} preList={listFilter} onClose={() => setImportOpen(false)} />}
+        {importOpen && contactsReady && <ImportWizard cx={cx} lk={lk} preList={listFilter} onClose={() => setImportOpen(false)} onSuccess={() => setRefresh(r => r + 1)} />}
         {openContact && <ContactDetail contact={openContact} cx={cx} lk={lk} onClose={() => setOpenContactId(null)} onConvert={(id) => cx.convertContact(id)} onLog={(c) => setLogCtx(c)} onStartQueue={startQueue} onEdit={(c) => setEditContact(c)} confirm={askConfirm} />}
         {logCtx && <LogOutcomeModal contact={cx.contacts.find(c => c.id === logCtx.id) || logCtx} cx={cx} onClose={() => setLogCtx(null)} />}
         {editContact && <ContactEditModal contact={editContact} cx={cx} onClose={() => setEditContact(null)} />}
@@ -2882,7 +2888,7 @@ function listStats(contacts, listId) {
 }
 
 /* ============================ Contact Lists view ============================ */
-function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExportList }) {
+function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExportList, refreshTrigger }) {
   const { cdb, contacts } = cx;
   const [newList, setNewList] = useState(null);
   const [newFolder, setNewFolder] = useState("");
@@ -2926,7 +2932,7 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
     };
     fetchLists();
     return () => { active = false; };
-  }, []);
+  }, [refreshTrigger]);
 
   const foldered = { "": [] };
   cdb.folders.forEach(f => foldered[f.id] = []);
@@ -3117,7 +3123,7 @@ function findDup(f, idx) {
 }
 
 /* ============================ Import wizard ============================ */
-function ImportWizard({ cx, lk, preList, onClose }) {
+function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
   const { cdb, contacts } = cx;
   const [step, setStep] = useState(0);
   const [file, setFile] = useState(null);
@@ -3226,7 +3232,7 @@ function ImportWizard({ cx, lk, preList, onClose }) {
       total: total, imported: newContacts.length, updated: updates.length, duplicates: stats.duplicates, rejected: rejected.length,
       status: "Complete", by: "You", mapping, rejectedRows: rejected.slice(0, 5000) });
     setBusy(""); setStep(3);
-    window.location.reload();
+    if (onSuccess) onSuccess();
   };
 
   const downloadRejected = () => {

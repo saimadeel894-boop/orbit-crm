@@ -273,7 +273,7 @@ export const createLeadList = async (data) => {
   const payload = {
     name: data.name,
     business_id: data.businessId || null,
-    industry_id: data.industry || null,
+    industry: data.industry || null,
     source: data.source || null,
     status: data.status || 'Active',
     user_id: uid

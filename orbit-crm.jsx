@@ -3635,11 +3635,13 @@ function BulkPrompt({ kind, cx, count, onClose, onApply }) {
     let targetV = v;
     if ((kind === "move" || kind === "add") && v === "new") {
       if (!newName.trim()) { setBusy(false); return; }
-      const nl = await dbApi.createLeadList({ name: newName.trim(), business_id: "b_23labs", status: "Active" });
+      const nl = await dbApi.createLeadList({ name: newName.trim(), businessId: "b_23labs", status: "Active" });
       if (nl.data?.id) {
         targetV = nl.data.id;
         cx.createList({ id: targetV, name: newName.trim(), businessId: "b_23labs", status: "Active" });
       } else {
+        console.error("Failed to create list inline:", nl.error);
+        alert("Failed to create list: " + (nl.error?.message || "Unknown error"));
         setBusy(false);
         return;
       }

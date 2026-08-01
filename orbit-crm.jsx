@@ -2060,7 +2060,7 @@ export default function App() {
           industries: industries || [],
           sources: sources || [],
           folders: folders || [],
-          lists: lists || [],
+          lists: (lists || []).map(l => ({ ...l, id: String(l.id) })),
           imports: imports || [],
           leads: leads || [],
           tasks: tasks || [],
@@ -3646,8 +3646,8 @@ function BulkPrompt({ kind, cx, count, onClose, onApply }) {
         return;
       }
     }
-    if (kind === "move") onApply(c => ({ ...c, listIds: [targetV] }), { lead_list_id: targetV });
-    else if (kind === "add") onApply(c => ({ ...c, listIds: c.listIds.includes(targetV) ? c.listIds : [...c.listIds, targetV] }), { lead_list_id: targetV });
+    if (kind === "move") onApply(c => ({ ...c, listIds: [String(targetV)] }), { lead_list_id: targetV });
+    else if (kind === "add") onApply(c => ({ ...c, listIds: c.listIds.includes(String(targetV)) ? c.listIds : [...c.listIds, String(targetV)] }), { lead_list_id: targetV });
     else if (kind === "industry") onApply(c => ({ ...c, industry: v }), null);
     else if (kind === "priority") onApply(c => ({ ...c, priority: v }), { priority: v });
     else if (kind === "business") onApply(c => ({ ...c, businessId: v }), { business_id: v });

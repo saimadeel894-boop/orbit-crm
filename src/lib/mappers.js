@@ -25,8 +25,8 @@ export const mapContactToLocal = (s) => ({
   contactName: s.name,
   // Other defaults
   activity: [],
-  listId: s.lead_list_id || null,
-  listIds: s.lead_list_id ? [s.lead_list_id] : []
+  listId: s.lead_list_id ? String(s.lead_list_id) : null,
+  listIds: s.lead_list_id ? [String(s.lead_list_id)] : []
 });
 
 export const mapContactToSupabase = (l, userId) => ({

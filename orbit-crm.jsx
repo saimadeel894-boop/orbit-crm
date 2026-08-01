@@ -817,17 +817,20 @@ function LeadForm({ initial, db, onSave, onClose, toast }) {
 
           <SubHead>Assignment</SubHead>
           <Field label="Business / brand">
-            <Select value={d.businessId} onChange={e => set("businessId", e.target.value)}>
+            <Select value={d.businessId || ""} onChange={e => set("businessId", e.target.value)}>
+              <option value="">None selected</option>
               {db.businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
           </Field>
           <Field label="Industry">
-            <Select value={d.industryId} onChange={e => set("industryId", e.target.value)}>
+            <Select value={d.industryId || ""} onChange={e => set("industryId", e.target.value)}>
+              <option value="">None selected</option>
               {db.industries.filter(i => !i.archived).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
             </Select>
           </Field>
           <Field label="Lead source">
-            <Select value={d.sourceId} onChange={e => set("sourceId", e.target.value)}>
+            <Select value={d.sourceId || ""} onChange={e => set("sourceId", e.target.value)}>
+              <option value="">None selected</option>
               {db.sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </Field>

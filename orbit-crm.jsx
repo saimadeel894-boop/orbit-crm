@@ -3623,12 +3623,27 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
 }
 
 function BulkPrompt({ kind, cx, count, onClose, onApply }) {
-  const [v, setV] = useState(kind === "priority" ? "High" : kind === "business" ? "b_23labs" : kind === "schedule" ? todayISO() : (kind === "move" || kind === "add") ? (cx.cdb.lists[0]?.id || "") : "");
+  const [v, setV] = useState(kind === "priority" ? "High" : kind === "business" ? "b_23labs" : kind === "schedule" ? todayISO() : (kind === "move" || kind === "add") ? (cx.cdb.lists.length > 0 ? cx.cdb.lists[0].id : "new") : "");
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
   const titles = { move: "Move to list", add: "Add to another list", industry: "Change industry", priority: "Change priority", business: "Assign to business", schedule: "Schedule a call date", tag: "Add a tag" };
-  const apply = () => {
-    if (kind === "move") onApply(c => ({ ...c, listIds: [v] }), { lead_list_id: v });
-    else if (kind === "add") onApply(c => ({ ...c, listIds: c.listIds.includes(v) ? c.listIds : [...c.listIds, v] }), { lead_list_id: v });
-    else if (kind === "industry") onApply(c => ({ ...c, industry: v }), null); // complex
+  const apply = async () => {
+    setBusy(true);
+    let targetV = v;
+    if ((kind === "move" || kind === "add") && v === "new") {
+      if (!newName.trim()) { setBusy(false); return; }
+      const nl = await dbApi.createLeadList({ name: newName.trim(), business_id: "b_23labs", status: "Active" });
+      if (nl.data?.id) {
+        targetV = nl.data.id;
+        cx.createList({ id: targetV, name: newName.trim(), businessId: "b_23labs", status: "Active" });
+      } else {
+        setBusy(false);
+        return;
+      }
+    }
+    if (kind === "move") onApply(c => ({ ...c, listIds: [targetV] }), { lead_list_id: targetV });
+    else if (kind === "add") onApply(c => ({ ...c, listIds: c.listIds.includes(targetV) ? c.listIds : [...c.listIds, targetV] }), { lead_list_id: targetV });
+    else if (kind === "industry") onApply(c => ({ ...c, industry: v }), null);
     else if (kind === "priority") onApply(c => ({ ...c, priority: v }), { priority: v });
     else if (kind === "business") onApply(c => ({ ...c, businessId: v }), { business_id: v });
     else if (kind === "schedule") onApply(c => ({ ...c, nextCallDate: v, callStatus: c.callStatus === "Cold" ? "Follow Up Required" : c.callStatus }), { next_call_date: v });
@@ -3636,26 +3651,29 @@ function BulkPrompt({ kind, cx, count, onClose, onApply }) {
   };
   return (
     <Modal onClose={onClose}>
-      <div className="modal-head"><h3>{titles[kind]}</h3><button className="icon-btn" onClick={onClose}><X size={17} /></button></div>
+      <div className="modal-head"><h3>{titles[kind]}</h3><button className="icon-btn" onClick={onClose} disabled={busy}><X size={17} /></button></div>
       <div className="sheet-body">
         <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 0 }}>Applies to {count.toLocaleString()} selected contacts.</p>
         {(kind === "move" || kind === "add") && (
-          cx.cdb.lists.length > 0 ? (
-            <Select value={v} onChange={e => setV(e.target.value)}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Select value={v} onChange={e => setV(e.target.value)} disabled={busy}>
+              <option value="new">➕ Create new list</option>
               {cx.cdb.lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </Select>
-          ) : (
-            <div style={{ fontSize: 13, color: "var(--red)", padding: "10px", background: "var(--red-light)", borderRadius: 6 }}>
-              You don't have any lists yet. Please create a list in the Contact Lists tab first.
-            </div>
-          )
+            {v === "new" && <Input placeholder="New list name..." value={newName} onChange={e => setNewName(e.target.value)} disabled={busy} autoFocus />}
+          </div>
         )}
-        {kind === "priority" && <Select value={v} onChange={e => setV(e.target.value)}>{["High", "Medium", "Low"].map(p => <option key={p} value={p}>{p}</option>)}</Select>}
-        {kind === "business" && <Select value={v} onChange={e => setV(e.target.value)}><option value="b_23labs">23Labs</option><option value="b_haylo">Haylo</option></Select>}
-        {kind === "schedule" && <Input type="date" value={v} onChange={e => setV(e.target.value)} />}
-        {(kind === "industry" || kind === "tag") && <Input value={v} onChange={e => setV(e.target.value)} placeholder={kind === "industry" ? "Industry name" : "Tag"} />}
+        {kind === "priority" && <Select value={v} onChange={e => setV(e.target.value)} disabled={busy}>{["High", "Medium", "Low"].map(p => <option key={p} value={p}>{p}</option>)}</Select>}
+        {kind === "business" && <Select value={v} onChange={e => setV(e.target.value)} disabled={busy}><option value="b_23labs">23Labs</option><option value="b_haylo">Haylo</option></Select>}
+        {kind === "schedule" && <Input type="date" value={v} onChange={e => setV(e.target.value)} disabled={busy} />}
+        {(kind === "industry" || kind === "tag") && <Input value={v} onChange={e => setV(e.target.value)} placeholder={kind === "industry" ? "Industry name" : "Tag"} disabled={busy} />}
       </div>
-      <div className="modal-foot"><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" onClick={apply} disabled={!v}>Apply</button></div>
+      <div className="modal-foot">
+        <button className="btn" onClick={onClose} disabled={busy}>Cancel</button>
+        <button className="btn btn-primary" onClick={apply} disabled={busy || (!v && v !== "new") || (v === "new" && !newName.trim())}>
+          {busy ? "Applying..." : "Apply"}
+        </button>
+      </div>
     </Modal>
   );
 }

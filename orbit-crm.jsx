@@ -3903,7 +3903,18 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
     });
   }, []);
 
-  const begin = (spec) => { const q = buildQueue(poolContacts, spec); setIds(q); setIdx(0); setRunning(true); setSession({ logged: 0, reached: 0 }); setQueueFetchError(null); };
+  const begin = (spec) => { 
+    const q = buildQueue(poolContacts, spec); 
+    if (!q.length) {
+      alert("No contacts found for this queue. They might be archived or marked Do Not Contact.");
+      return;
+    }
+    setIds(q); 
+    setIdx(0); 
+    setRunning(true); 
+    setSession({ logged: 0, reached: 0 }); 
+    setQueueFetchError(null); 
+  };
   useEffect(() => { if (startSpec && poolContacts.length) { begin(startSpec); clearSpec && clearSpec(); } /* eslint-disable-next-line */ }, [startSpec, poolContacts.length]);
 
   useEffect(() => {

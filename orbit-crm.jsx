@@ -3639,7 +3639,17 @@ function BulkPrompt({ kind, cx, count, onClose, onApply }) {
       <div className="modal-head"><h3>{titles[kind]}</h3><button className="icon-btn" onClick={onClose}><X size={17} /></button></div>
       <div className="sheet-body">
         <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 0 }}>Applies to {count.toLocaleString()} selected contacts.</p>
-        {(kind === "move" || kind === "add") && <Select value={v} onChange={e => setV(e.target.value)}>{cx.cdb.lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</Select>}
+        {(kind === "move" || kind === "add") && (
+          cx.cdb.lists.length > 0 ? (
+            <Select value={v} onChange={e => setV(e.target.value)}>
+              {cx.cdb.lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </Select>
+          ) : (
+            <div style={{ fontSize: 13, color: "var(--red)", padding: "10px", background: "var(--red-light)", borderRadius: 6 }}>
+              You don't have any lists yet. Please create a list in the Contact Lists tab first.
+            </div>
+          )
+        )}
         {kind === "priority" && <Select value={v} onChange={e => setV(e.target.value)}>{["High", "Medium", "Low"].map(p => <option key={p} value={p}>{p}</option>)}</Select>}
         {kind === "business" && <Select value={v} onChange={e => setV(e.target.value)}><option value="b_23labs">23Labs</option><option value="b_haylo">Haylo</option></Select>}
         {kind === "schedule" && <Input type="date" value={v} onChange={e => setV(e.target.value)} />}

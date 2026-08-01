@@ -3948,18 +3948,27 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
         <div className="card card-pad">
           <SubHead>Start a call session</SubHead>
           <p style={{ fontSize: 13, color: "var(--muted)", margin: "6px 0 16px" }}>Build a queue and call through it one contact at a time. Do Not Contact contacts are always excluded.</p>
-          <Field label="Build queue from" full>
-            <Select value={b.source} onChange={e => setB({ ...b, source: e.target.value })}>
-              <option value="list">An entire contact list</option>
-              <option value="due">Contacts due for follow-up (today or overdue)</option>
-              <option value="never">Contacts never previously called</option>
-              <option value="outcome">Contacts with a specific previous outcome</option>
-              <option value="filter_notcalled">A saved view: never called</option>
-              <option value="filter_stale">A saved view: no activity 14 days</option>
-            </Select>
-          </Field>
-          {b.source === "list" && <Field label="List" full><Select value={b.listId} onChange={e => setB({ ...b, listId: e.target.value })}>{cdb.lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</Select></Field>}
-          {b.source === "outcome" && <Field label="Previous outcome" full><Select value={b.outcome} onChange={e => setB({ ...b, outcome: e.target.value })}>{CALL_OUTCOMES.map(o => <option key={o.key} value={o.key}>{o.key}</option>)}</Select></Field>}
+          <div style={{ background: "var(--bg-card)", padding: 20, borderRadius: 8, maxWidth: 500 }}>
+            <Field label="Build queue from" full>
+              <Select value={b.source} onChange={e => setB({ ...b, source: e.target.value, listId: b.source !== "list" ? cdb.lists[0]?.id || "" : b.listId })}>
+                <option value="list">An entire contact list</option>
+                <option value="due">Contacts due for follow-up (today or overdue)</option>
+                <option value="never">Contacts never previously called</option>
+                <option value="outcome">Contacts with a specific previous outcome</option>
+                <option value="filter_notcalled">A saved view: never called</option>
+                <option value="filter_stale">A saved view: no activity 14 days</option>
+              </Select>
+            </Field>
+            {b.source === "list" && (
+              <Field label="List" full>
+                <Select value={b.listId} onChange={e => setB({ ...b, listId: e.target.value })}>
+                  <option value="">{cdb.lists.length === 0 ? "No lists available" : "Select a list"}</option>
+                  {cdb.lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </Select>
+              </Field>
+            )}
+            {b.source === "outcome" && <Field label="Previous outcome" full><Select value={b.outcome} onChange={e => setB({ ...b, outcome: e.target.value })}>{CALL_OUTCOMES.map(o => <option key={o.key} value={o.key}>{o.key}</option>)}</Select></Field>}
+          </div>
           <div style={{ marginTop: 8 }}>
             {(() => {
               const spec = b.source === "list" ? { type: "list", listId: b.listId }

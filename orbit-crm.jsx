@@ -4149,7 +4149,7 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
       </div>
 
       <div className="toolbar" style={{ flexWrap: "wrap" }}>
-        <button className="btn btn-primary" disabled={!cold.length} onClick={() => onStartQueue({ type: "ids", ids: cold.map(c => c.id) })}><Play size={15} />Start calling {cold.length.toLocaleString()}</button>
+        <button className="btn btn-primary" disabled={selected.size === 0 && !cold.length} onClick={() => onStartQueue({ type: "ids", ids: selected.size > 0 ? Array.from(selected) : cold.map(c => c.id) })}><Play size={15} />Start calling {selected.size > 0 ? selected.size.toLocaleString() : cold.length.toLocaleString()}</button>
         <div className="searchbar" style={{ position: "relative", minWidth: 200 }}><Search size={15} className="si" /><input value={q} placeholder="Search Cold…" onChange={e => setQ(e.target.value)} /></div>
         <Select style={{ width: 120 }} value={f.business} onChange={e => setF({ ...f, business: e.target.value })}><option value="all">All business</option><option value="b_23labs">23Labs</option><option value="b_haylo">Haylo</option></Select>
         <Select style={{ width: 140 }} value={f.industry} onChange={e => setF({ ...f, industry: e.target.value })}><option value="all">All industries</option>{industries.map(i => <option key={i} value={i}>{i}</option>)}</Select>

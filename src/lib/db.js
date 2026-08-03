@@ -283,5 +283,22 @@ export const createLeadList = async (data) => {
 
 export const getAllQueueContacts = async () => {
   const uid = await getUid();
-  return handleResponse(await supabase.from('contacts').select('id, business_id, industry_id, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at').eq('user_id', uid));
+  let allData = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('id, business_id, industry_id, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at, archived')
+      .eq('user_id', uid)
+      .range(from, from + pageSize - 1);
+      
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+    
+    allData = allData.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: allData, error: null };
 };

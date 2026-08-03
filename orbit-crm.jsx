@@ -2090,11 +2090,11 @@ export default function App() {
   }, []);
 
   const lk = useMemo(() => {
-    if (!db) return { biz: () => null, ind: () => null, src: () => null };
+    if (!db) return { biz: () => null, ind: () => null, src: () => null, businesses: [] };
     const bm = Object.fromEntries(db.businesses.map(b => [b.id, b]));
     const im = Object.fromEntries(db.industries.map(i => [i.id, i]));
     const sm = Object.fromEntries(db.sources.map(s => [s.id, s]));
-    return { biz: id => bm[id] || null, ind: id => im[id] || null, src: id => sm[id] || null };
+    return { biz: id => bm[id] || null, ind: id => im[id] || null, src: id => sm[id] || null, businesses: db.businesses };
   }, [db]);
 
   /* ---- cold calling module ---- */
@@ -3236,7 +3236,7 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
     if (ctx.target === "new") { 
       const listData = { 
         name: ctx.newName || (file ? file.name.replace(/\.(csv|xlsx|xls)$/i, "") : "Imported list"), 
-        business_id: ctx.businessId, 
+        businessId: ctx.businessId, 
         industry: ctx.industry, 
         source: ctx.source, 
         status: "Active" 
@@ -3360,7 +3360,7 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
                   </Select>
                 </Field>
                 {ctx.target === "new" && <Field label="New list name"><Input value={ctx.newName} onChange={e => setCtx(c => ({ ...c, newName: e.target.value }))} placeholder={file ? file.name.replace(/\.[^.]+$/, "") : "Imported list"} /></Field>}
-                <Field label="Business"><Select value={ctx.businessId} onChange={e => setCtx(c => ({ ...c, businessId: e.target.value }))}>{lk.businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></Field>
+                <Field label="Business"><Select value={ctx.businessId} onChange={e => setCtx(c => ({ ...c, businessId: e.target.value }))}>{(lk?.businesses || []).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></Field>
                 <Field label="Default industry"><Input value={ctx.industry} onChange={e => setCtx(c => ({ ...c, industry: e.target.value }))} placeholder="Used when a row has none" /></Field>
               </div>
             </div>

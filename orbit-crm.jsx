@@ -3537,7 +3537,7 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
       pageSize,
       orderBy: sort.key === 'company' ? 'company' : sort.key === 'created_at' ? 'created_at' : 'name'
       });
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load. Please refresh.")), 5000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load. Please refresh.")), 25000));
       const { data, count, error } = await Promise.race([fetchPromise, timeoutPromise]);
       if (error) {
         setErrorState(error.message || "Unknown error occurred");
@@ -3964,7 +3964,7 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
     setLoadingPool(true);
     setPoolError(null);
     const fetchPromise = dbApi.getAllQueueContacts();
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load queue data. Please refresh.")), 5000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Failed to load queue data. Please refresh.")), 25000));
     Promise.race([fetchPromise, timeoutPromise]).then(res => {
       if (res.error) setPoolError(res.error.message || "Unknown error");
       else if (res.data) setPoolContacts(res.data.map(mapContactToLocal));
@@ -4168,7 +4168,7 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
         page: page + 1,
         pageSize
       });
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("No cold contacts found")), 5000));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("No cold contacts found")), 25000));
       const { data, count, error } = await Promise.race([fetchPromise, timeoutPromise]);
       if (error) {
         setErrorState("No cold contacts found");

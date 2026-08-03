@@ -1111,11 +1111,34 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
   const setQual = (k, v) => onUpdate({ qual: { ...lead.qual, [k]: v } });
   const setDeal = (k, v) => onUpdate({ deal: { ...lead.deal, [k]: v } });
 
+  const [activities, setActivities] = useState([]);
+  useEffect(() => {
+    if (lead.contactId) {
+      dbApi.getActivity(lead.contactId).then(res => {
+        if (res.data) {
+          // map to local format if needed, but the UI expects lead.interactions format
+          // Wait, interactions format is: {id, type, date, notes, outcome, nextAction, followUpDate}
+          // The DB returns {id, type, date, outcome, notes, person, follow_up_date, ...}
+          setActivities(res.data.map(a => ({
+            id: a.id, type: a.type, date: a.date, outcome: a.outcome, notes: a.notes, person: a.person,
+            nextAction: a.next_action || a.nextAction, followUpDate: a.follow_up_date
+          })));
+        }
+      });
+    }
+  }, [lead.contactId]);
+
+  // Merge the ones just created locally (lead.interactions) with the fetched ones
+  const allInteractions = [...(lead.interactions || []), ...activities].reduce((acc, curr) => {
+    if (!acc.find(x => x.id === curr.id)) acc.push(curr);
+    return acc;
+  }, []);
+
   const tabs = [
     { key: "overview", label: "Overview" },
     { key: "qual", label: "Qualification" },
     { key: "deal", label: "Deal" },
-    { key: "activity", label: "Activity", count: (lead.interactions || []).length },
+    { key: "activity", label: "Activity", count: allInteractions.length },
     { key: "tasks", label: "Tasks", count: leadTasks.length },
   ];
 
@@ -1260,9 +1283,9 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
         {tab === "activity" && (
           <div>
             <button className="btn btn-primary btn-sm" style={{ marginBottom: 16 }} onClick={() => onLog(lead)}><Plus size={14} />Log interaction</button>
-            {(lead.interactions || []).length === 0 ? <Empty icon={MessageSquare} title="No activity yet" sub="Log your first call, email or note." /> : (
+            {allInteractions.length === 0 ? <Empty icon={MessageSquare} title="No activity yet" sub="Log your first call, email or note." /> : (
               <div className="timeline">
-                {[...(lead.interactions || [])].sort((a, b) => new Date(b.date) - new Date(a.date)).map(it => {
+                {[...allInteractions].sort((a, b) => new Date(b.date) - new Date(a.date)).map(it => {
                   const meta = INTERACTION_TYPES.find(t => t.key === it.type) || INTERACTION_TYPES[8];
                   return (
                     <div key={it.id} className="tl-item">
@@ -2144,8 +2167,11 @@ export default function App() {
 
   const patchLead = async (id, patch) => {
     const currentLead = db.leads?.find(l => l.id === id) || openLead || {}; // might be missing if not loaded globally
+    update(n => {
+      const idx = n.leads.findIndex(x => x.id === id);
+      if (idx !== -1) n.leads[idx] = { ...n.leads[idx], ...patch };
+    });
     await dbApi.updateLead(id, mapLeadToSupabase({ ...currentLead, ...patch }));
-    setRefresh(r => r + 1);
   };
 
   const deleteLead = async (id) => { 
@@ -2173,11 +2199,23 @@ export default function App() {
   };
 
   const addInteraction = async (leadId, interaction) => {
-    // Interactions array not in Supabase schema directly, but maybe we can update lastInteraction on lead
-    // await dbApi.updateLead(leadId, { last_interaction: interaction.date, next_follow_up: interaction.followUpDate });
+    const lead = db.leads.find(l => l.id === leadId) || openLead;
+    if (!lead || !lead.contactId) {
+      toast("Error: Lead has no linked contact to save notes to.", "error");
+      return;
+    }
+    const activity = { ...interaction, contactId: lead.contactId, attempt: true };
+    await dbApi.addActivity(lead.contactId, mapActivityToSupabase(activity));
+    
+    update(n => {
+      const idx = n.leads.findIndex(x => x.id === leadId);
+      if (idx !== -1) {
+        n.leads[idx].interactions = [interaction, ...(n.leads[idx].interactions || [])];
+      }
+    });
+    
     setIntForm(null);
     toast("Interaction logged");
-    setRefresh(r => r + 1);
   };
 
   /* ---- task handlers ---- */
@@ -2783,8 +2821,14 @@ function useContacts(db, update, toast) {
   };
 
   /* ---- log a call outcome ---- */
-  const logOutcome = (id, data) => {
-    const c = contacts.find(x => x.id === id); if (!c) return;
+  const logOutcome = async (id, data) => {
+    let c = contacts.find(x => x.id === id); 
+    if (!c) {
+      const res = await dbApi.getContactById(id);
+      if (res.data) c = mapContactToLocal(res.data);
+    }
+    if (!c) return;
+    
     const channel = data.channel || "Call";
     const meta = data.outcome ? outcomeMeta(data.outcome, cdb.customOutcomes) : { status: "Attempted", reached: false, rule: {} };
     let nextCallDate = data.followUpDate || "";
@@ -3750,7 +3794,24 @@ function ContactDetail({ contact, cx, lk, onClose, onConvert, onLog, onStartQueu
   const c = contact;
   const [note, setNote] = useState("");
   const [fu, setFu] = useState({ date: c.nextCallDate || "", time: c.nextCallTime || "" });
-  const acts = [...(c.activity || [])].reverse();
+  
+  const [activities, setActivities] = useState([]);
+  useEffect(() => {
+    if (c.id) {
+      dbApi.getActivity(c.id).then(res => {
+        if (res.data) {
+          setActivities(res.data.map(mapActivityToLocal));
+        }
+      });
+    }
+  }, [c.id]);
+
+  const allActs = [...(c.activity || []), ...activities].reduce((acc, curr) => {
+    if (!acc.find(x => x.id === curr.id)) acc.push(curr);
+    return acc;
+  }, []);
+
+  const acts = allActs.sort((a, b) => new Date(b.date) - new Date(a.date));
   const actIcon = (a) => a.type === "note" ? StickyNote : a.type === "convert" ? UserPlus : a.type === "status" ? ShieldAlert : PhoneCall;
   const inList = (c.listIds || []).map(id => lk && cx.cdb.lists.find(l => l.id === id)?.name).filter(Boolean).join(", ");
   return (

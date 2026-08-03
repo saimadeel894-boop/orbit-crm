@@ -2,8 +2,12 @@ import { supabase } from './supabase';
 import { mapContactToSupabase } from './mappers';
 
 // Helper to get current user ID
-const getUid = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
+export const getSession = async () => {
+  return await supabase.auth.getSession();
+};
+
+export const getUid = async () => {
+  const { data: { session } } = await getSession();
   if (!session?.user?.id) throw new Error('Not authenticated');
   return session.user.id;
 };
@@ -30,7 +34,9 @@ export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50,
   if (businessId && businessId !== 'all') query = query.eq('business_id', businessId);
   if (listId && listId !== 'all') query = query.eq('lead_list_id', listId);
   if (callStatus && callStatus !== 'all') query = query.eq('call_status', callStatus);
-  if (search) query = query.ilike('name', `%${search}%`);
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+  }
 
   query = query.order(orderBy, { ascending: false }).range(from, to);
 
@@ -115,7 +121,24 @@ export const getLeads = async ({ businessId, stage, page = 1, pageSize = 50 }) =
 
 export const createLead = async (data) => {
   const uid = await getUid();
-  return handleResponse(await supabase.from('leads').insert({ ...data, user_id: uid }).select().single());
+  let contact_id = data.contact_id;
+  
+  if (!contact_id) {
+    const contactData = {
+      name: data.title,
+      company: data.title,
+      user_id: uid,
+      business_id: data.business_id,
+      call_status: 'Lead',
+      priority: data.priority || 'Medium'
+    };
+    const { data: newContact, error } = await supabase.from('contacts').insert(contactData).select('id').single();
+    if (!error && newContact) {
+      contact_id = newContact.id;
+    }
+  }
+
+  return handleResponse(await supabase.from('leads').insert({ ...data, contact_id, user_id: uid }).select().single());
 };
 
 export const updateLead = async (id, patch) => {

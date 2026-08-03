@@ -312,7 +312,7 @@ export const getAllQueueContacts = async () => {
   while (true) {
     const { data, error } = await supabase
       .from('contacts')
-      .select('id, business_id, industry_id, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at, archived')
+      .select('id, business_id, industry_id, lead_list_id, call_status, priority, attempts, conversations, next_call_date, last_outcome, created_at')
       .eq('user_id', uid)
       .range(from, from + pageSize - 1);
       

@@ -2379,8 +2379,8 @@ export default function App() {
                   <>
                     {cx.storageWarn && <div className="warn-banner"><AlertTriangle size={15} />This dataset is large for in-browser storage. Auto-save may be partial — use Settings → Backup, or export, to keep a durable copy.</div>}
                     {nav === "cold" && <ColdView cx={cx} lk={lk} onOpenContact={setOpenContactId} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} />}
-                    {nav === "contact_lists" && <ContactListsView cx={cx} lk={lk} refreshTrigger={refresh} onOpenList={(id) => { setNav("all_contacts"); setListFilter(id); }} onStartQueue={startQueue} onImport={() => setImportOpen(true)} onExportList={(id) => exportContacts(cx.contacts.filter(c => c.listIds.includes(id)), "list")} confirm={askConfirm} />}
-                    {nav === "all_contacts" && <AllContactsView cx={cx} lk={lk} initialFilter={listFilter ? { list: listFilter } : null} onOpenContact={setOpenContactId} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} />}
+                    {nav === "contact_lists" && <ContactListsView cx={cx} lk={lk} refreshTrigger={refresh} onRefresh={() => setRefresh(r => r + 1)} onOpenList={(id) => { setNav("all_contacts"); setListFilter(id); }} onStartQueue={startQueue} onImport={() => setImportOpen(true)} onExportList={(id) => exportContacts(cx.contacts.filter(c => c.listIds.includes(id)), "list")} confirm={askConfirm} />}
+                    {nav === "all_contacts" && <AllContactsView cx={cx} lk={lk} initialFilter={listFilter ? { list: listFilter } : null} onOpenContact={setOpenContactId} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} refresh={refresh} />}
                     {nav === "call_queue" && <CallQueueView cx={cx} lk={lk} startSpec={queueSpec} clearSpec={() => setQueueSpec(null)} confirm={askConfirm} />}
                     {nav === "cold_dashboard" && <ColdDashboard cx={cx} lk={lk} />}
                     {nav === "import_history" && <ImportHistoryView cx={cx} lk={lk} onImport={() => setImportOpen(true)} confirm={askConfirm} />}
@@ -2908,7 +2908,7 @@ function listStats(contacts, listId) {
 }
 
 /* ============================ Contact Lists view ============================ */
-function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExportList, refreshTrigger }) {
+function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExportList, refreshTrigger, onRefresh }) {
   const { cdb, contacts } = cx;
   const [newList, setNewList] = useState(null);
   const [newFolder, setNewFolder] = useState("");
@@ -2987,7 +2987,18 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
             </select>
           </div>
           <button className="icon-btn" title="Export" onClick={() => onExportList(l.id)}><Download size={15} /></button>
-          <button className="icon-btn" title="Delete" onClick={() => { if (confirm("Delete this list? Contacts stay in the database.")) cx.deleteList(l.id); }}><Trash2 size={15} /></button>
+          <button className="icon-btn" title="Delete" onClick={async () => { 
+            if (confirm("This will permanently delete the list and all its contacts.")) {
+              const { data: { session } } = await getSession();
+              if (session) {
+                const uid = session.user.id;
+                await supabase.from('contacts').delete().eq('lead_list_id', l.id).eq('user_id', uid);
+                await supabase.from('lead_lists').delete().eq('id', l.id).eq('user_id', uid);
+              }
+              cx.deleteList(l.id);
+              if (onRefresh) onRefresh();
+            }
+          }}><Trash2 size={15} /></button>
         </div>
       </div>
     );

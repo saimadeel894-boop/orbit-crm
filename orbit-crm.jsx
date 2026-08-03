@@ -4112,10 +4112,16 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
           </div>
         </div>
 
-        <a href={c.phone ? "tel:" + c.phone : undefined} style={{ display: "block", textAlign: "center", fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk'", color: "var(--accent-ink)", textDecoration: "none", padding: "10px 0 16px" }}>{c.phone || "No phone"}</a>
+        <div 
+          onClick={() => { if (c.phone) { navigator.clipboard.writeText(c.phone); cx.toast("Number copied!"); } }}
+          style={{ display: "block", textAlign: "center", fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk'", color: "var(--accent-ink)", textDecoration: "none", padding: "10px 0 16px", cursor: "pointer" }}
+          title="Click to copy"
+        >
+          {c.phone || "No phone"}
+        </div>
 
         <div className="call-actions" style={{ marginBottom: 16 }}>
-          <a className="ca-btn primary" href={c.phone ? "tel:" + c.phone : undefined}><Phone size={18} />Call</a>
+          <button className="ca-btn primary" onClick={() => { if (c.phone) { navigator.clipboard.writeText(c.phone); cx.toast("Number copied!"); } }}><Copy size={18} />Copy</button>
           <button className="ca-btn" onClick={() => setLogging(true)}><PhoneForwarded size={18} />Log outcome</button>
           <button className="ca-btn" onClick={() => confirm({ title: "Convert to lead?", body: c.company + " will join the sales pipeline.", confirmLabel: "Convert", onConfirm: () => { cx.convertContact(c.id); advance(); } })}><UserPlus size={18} />Convert</button>
           <button className="ca-btn" onClick={advance}><SkipForward size={18} />Skip</button>

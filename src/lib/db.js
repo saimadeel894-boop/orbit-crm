@@ -153,8 +153,11 @@ export const deleteLead = async (id) => {
 
 // --- ACTIVITY ---
 
-export const getActivity = async (contactId) => {
+export const getActivities = async (contactId) => {
   const uid = await getUid();
+  if (!contactId || typeof contactId !== 'string' || contactId.length !== 36 || !contactId.includes('-')) {
+    return { data: [] };
+  }
   return handleResponse(await supabase.from('activity_log').select('*').eq('contact_id', contactId).eq('user_id', uid).order('date', { ascending: false }));
 };
 

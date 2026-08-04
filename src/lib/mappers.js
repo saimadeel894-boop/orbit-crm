@@ -114,7 +114,6 @@ export const mapTaskToLocal = (s) => ({
 });
 
 export const mapTaskToSupabase = (l, userId) => ({
-  id: l.id,
   title: l.title || 'Untitled',
   lead_id: l.leadId || null,
   contact_id: l.contactId || null,
@@ -140,7 +139,6 @@ export const mapActivityToLocal = (s) => ({
 });
 
 export const mapActivityToSupabase = (l, userId) => ({
-  id: l.id,
   contact_id: l.contactId || null,
   type: l.type || 'note',
   date: l.date || new Date().toISOString(),

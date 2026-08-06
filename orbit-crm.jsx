@@ -12,6 +12,9 @@ import {
   Rows3, ThumbsDown, Info, ArrowLeft, CircleSlash, MoveRight, Contact as ContactIcon,
   CalendarPlus, Save, Eraser, Snowflake, LogOut
 } from "lucide-react";
+
+const SafeKanbanSquare = KanbanSquare || LayoutDashboard;
+const SafeContactIcon = ContactIcon || Users;
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Legend
@@ -588,9 +591,10 @@ function Select({ children, ...p }) { return <select className="select" {...p}>{
 function SubHead({ children }) { return <div className="sub-head">{children}</div>; }
 
 function Empty({ icon: Icon = Inbox, title, sub, action }) {
+  const SafeIcon = Icon || Inbox;
   return (
     <div className="empty">
-      <div className="e-ico"><Icon size={22} /></div>
+      <div className="e-ico"><SafeIcon size={22} /></div>
       <div style={{ fontWeight: 600, color: "var(--ink-2)", fontSize: 14 }}>{title}</div>
       {sub && <div style={{ fontSize: 13, marginTop: 4 }}>{sub}</div>}
       {action && <div style={{ marginTop: 14 }}>{action}</div>}
@@ -1349,7 +1353,7 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
 function Metric({ label, value, sub, icon: Icon, color = "var(--accent)" }) {
   return (
     <div className="metric">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div className="m-label">{label}</div>
         {Icon && <div className="m-ico" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}><Icon size={15} /></div>}
       </div>
@@ -1360,9 +1364,10 @@ function Metric({ label, value, sub, icon: Icon, color = "var(--accent)" }) {
 }
 
 function AttentionRow({ icon: Icon, color, title, sub, onClick }) {
+  const SafeIcon = Icon || AlertTriangle;
   return (
     <div className="attn-row" onClick={onClick}>
-      <div className="attn-ico" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}><Icon size={16} /></div>
+      <div className="attn-ico" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}><SafeIcon size={16} /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 550, fontSize: 13 }}>{title}</div>
         <div style={{ fontSize: 12, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>
@@ -1984,14 +1989,14 @@ function LeadsWorkspace({ db, lk, defaultView, onOpen, onNew, onMove, onToggleFa
 const NAV = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "leads", label: "Leads", icon: Users },
-  { key: "pipeline", label: "Pipeline", icon: KanbanSquare },
+  { key: "pipeline", label: "Pipeline", icon: SafeKanbanSquare },
   { key: "tasks", label: "Tasks", icon: CheckSquare },
   { key: "calendar", label: "Calendar", icon: CalendarIcon },
   { key: "reports", label: "Reports", icon: BarChart3 },
   { group: "Cold calling" },
   { key: "cold", label: "Cold", icon: Snowflake },
   { key: "contact_lists", label: "Contact Lists", icon: Database },
-  { key: "all_contacts", label: "All Contacts", icon: ContactIcon },
+  { key: "all_contacts", label: "All Contacts", icon: SafeContactIcon },
   { key: "call_queue", label: "Call Queue", icon: PhoneCall },
   { key: "cold_dashboard", label: "Cold Dashboard", icon: Gauge },
   { key: "import_history", label: "Import History", icon: FileSpreadsheet },
@@ -2352,7 +2357,7 @@ export default function App() {
               ) : (
                 <button key={item.key} className={clsx("nav-item", nav === item.key && "active")}
                   onClick={() => { setNav(item.key); setSidebarOpen(false); setListFilter(null); }}>
-                  <item.icon size={17} /> {item.label}
+                  {(() => { const ItemIcon = item.icon || LayoutDashboard; return <ItemIcon size={17} />; })()} {item.label}
                   {item.key === "leads" && <span className="count">{counts.leads}</span>}
                   {item.key === "tasks" && counts.tasks > 0 && <span className="count">{counts.tasks}</span>}
                   {item.key === "cold" && counts.cold > 0 && <span className="count">{counts.cold > 9999 ? "9999+" : counts.cold}</span>}

@@ -161,6 +161,8 @@ export const getActivities = async (contactId) => {
   return handleResponse(await supabase.from('activity_log').select('*').eq('contact_id', contactId).eq('user_id', uid).order('date', { ascending: false }));
 };
 
+export const getActivity = getActivities;
+
 export const addActivity = async (contactId, data) => {
   const uid = await getUid();
   return handleResponse(await supabase.from('activity_log').insert({ ...data, contact_id: contactId, user_id: uid }).select().single());

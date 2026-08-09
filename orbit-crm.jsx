@@ -2919,7 +2919,7 @@ function useContacts(db, update, toast) {
   };
 
   return {
-    cdb, contacts, cloaded, storageWarn, setStorageWarn, cupdate,
+    cdb, contacts, cloaded, storageWarn, setStorageWarn, cupdate, toast,
     createList, updateList, deleteList, createFolder, deleteFolder,
     updateContact, bulkUpdate, bulkDelete, addContacts, deleteActivity,
     isDNC, registerDNC, convertContact, logOutcome, markInvalid, markDNC,
@@ -4014,34 +4014,46 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
   useEffect(() => { if (startSpec && poolContacts.length) { begin(startSpec); clearSpec && clearSpec(); } /* eslint-disable-next-line */ }, [startSpec, poolContacts.length]);
 
   useEffect(() => {
-    if (running && idx < ids.length) {
-      setCurrentContact(null); // Clear while loading
-      setQueueFetchError(null);
-      Promise.all([
-        dbApi.getContactById(ids[idx]),
-        dbApi.getActivity(ids[idx])
-      ]).then(([cRes, aRes]) => {
-        if (cRes.error) {
-          console.error("Queue contact fetch error:", cRes.error);
-          setQueueFetchError(cRes.error.message || JSON.stringify(cRes.error));
-        } else if (cRes.data) {
-          try {
-            const c = mapContactToLocal(cRes.data);
-            c.activity = aRes.data ? aRes.data.map(mapActivityToLocal) : [];
-            setCurrentContact(c);
-          } catch (e) {
-            console.error("Mapping error:", e);
-            setQueueFetchError(e.message);
-          }
-        } else {
-          setQueueFetchError("Contact not found");
+    if (!running || idx >= ids.length) return;
+    const contactId = ids[idx];
+    setQueueFetchError(null);
+
+    const cached = poolContacts.find(c => c.id === contactId);
+    if (cached) {
+      setCurrentContact({ ...cached });
+      dbApi.getActivity(contactId).then(aRes => {
+        if (aRes.data?.length) {
+          setCurrentContact(c => c ? { ...c, activity: aRes.data.map(mapActivityToLocal) } : c);
         }
-      }).catch(e => {
-        console.error("Promise.all error:", e);
-        setQueueFetchError(e.message);
-      });
+      }).catch(console.error);
+      return;
     }
-  }, [running, idx, ids]);
+
+    setCurrentContact(null);
+    Promise.all([
+      dbApi.getContactById(contactId),
+      dbApi.getActivity(contactId)
+    ]).then(([cRes, aRes]) => {
+      if (cRes.error) {
+        console.error("Queue contact fetch error:", cRes.error);
+        setQueueFetchError(cRes.error.message || JSON.stringify(cRes.error));
+      } else if (cRes.data) {
+        try {
+          const c = mapContactToLocal(cRes.data);
+          c.activity = aRes.data ? aRes.data.map(mapActivityToLocal) : [];
+          setCurrentContact(c);
+        } catch (e) {
+          console.error("Mapping error:", e);
+          setQueueFetchError(e.message);
+        }
+      } else {
+        setQueueFetchError("Contact not found");
+      }
+    }).catch(e => {
+      console.error("Promise.all error:", e);
+      setQueueFetchError(e.message);
+    });
+  }, [running, idx, ids, poolContacts]);
 
   const advance = () => { setLogging(false); setNote(""); setIdx(i => i + 1); };
   const onLogged = () => { setSession(s => ({ logged: s.logged + 1, reached: s.reached })); advance(); };

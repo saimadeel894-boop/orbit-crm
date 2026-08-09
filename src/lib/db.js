@@ -18,6 +18,8 @@ const handleResponse = (res) => ({
   count: res.count
 });
 
+const isUuid = (id) => typeof id === 'string' && id.length === 36 && id.includes('-');
+
 // --- CONTACTS ---
 
 export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50, search = '', callStatus = '', orderBy = 'created_at' }) => {
@@ -53,8 +55,9 @@ export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50,
 };
 
 export const getContactById = async (id) => {
+  if (!isUuid(id)) return { data: null, error: null };
   const uid = await getUid();
-  return handleResponse(await supabase.from('contacts').select('*').eq('id', id).eq('user_id', uid).single());
+  return handleResponse(await supabase.from('contacts').select('*').eq('id', id).eq('user_id', uid).maybeSingle());
 };
 
 export const createContact = async (data) => {
@@ -63,8 +66,9 @@ export const createContact = async (data) => {
 };
 
 export const updateContact = async (id, patch) => {
+  if (!isUuid(id)) return { data: null, error: null };
   const uid = await getUid();
-  return handleResponse(await supabase.from('contacts').update(patch).eq('id', id).eq('user_id', uid).select().single());
+  return handleResponse(await supabase.from('contacts').update(patch).eq('id', id).eq('user_id', uid).select().maybeSingle());
 };
 
 export const deleteContact = async (id) => {
@@ -157,18 +161,17 @@ export const deleteLead = async (id) => {
 // --- ACTIVITY ---
 
 export const getActivities = async (contactId) => {
+  if (!isUuid(contactId)) return { data: [], error: null };
   const uid = await getUid();
-  if (!contactId || typeof contactId !== 'string' || contactId.length !== 36 || !contactId.includes('-')) {
-    return { data: [] };
-  }
   return handleResponse(await supabase.from('activity_log').select('*').eq('contact_id', contactId).eq('user_id', uid).order('date', { ascending: false }));
 };
 
 export const getActivity = getActivities;
 
 export const addActivity = async (contactId, data) => {
+  if (!isUuid(contactId)) return { data: null, error: null };
   const uid = await getUid();
-  return handleResponse(await supabase.from('activity_log').insert({ ...data, contact_id: contactId, user_id: uid }).select().single());
+  return handleResponse(await supabase.from('activity_log').insert({ ...data, contact_id: contactId, user_id: uid }).select().maybeSingle());
 };
 
 // --- TASKS ---

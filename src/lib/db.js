@@ -71,6 +71,13 @@ export const updateContact = async (id, patch) => {
   if (!isUuid(id)) return { data: null, error: null };
   const uid = await getUid();
   const cleanPatch = Object.fromEntries(Object.entries(patch || {}).filter(([k]) => ALLOWED_FIELDS.includes(k)));
+  const DATE_FIELDS = ['last_call_date', 'next_call_date'];
+  DATE_FIELDS.forEach(f => {
+    if (cleanPatch[f] === '' || cleanPatch[f] === undefined) {
+      cleanPatch[f] = null;
+    }
+  });
+  if (cleanPatch.email === '') cleanPatch.email = null;
   console.log("Final patch:", JSON.stringify(cleanPatch));
   return handleResponse(await supabase.from('contacts').update(cleanPatch).eq('id', id).eq('user_id', uid).select().maybeSingle());
 };
@@ -83,6 +90,13 @@ export const deleteContact = async (id) => {
 export const bulkUpdateContacts = async (ids, patch) => {
   const uid = await getUid();
   const cleanPatch = Object.fromEntries(Object.entries(patch || {}).filter(([k]) => ALLOWED_FIELDS.includes(k)));
+  const DATE_FIELDS = ['last_call_date', 'next_call_date'];
+  DATE_FIELDS.forEach(f => {
+    if (cleanPatch[f] === '' || cleanPatch[f] === undefined) {
+      cleanPatch[f] = null;
+    }
+  });
+  if (cleanPatch.email === '') cleanPatch.email = null;
   console.log("Final patch:", JSON.stringify(cleanPatch));
   return handleResponse(await supabase.from('contacts').update(cleanPatch).in('id', ids).eq('user_id', uid));
 };

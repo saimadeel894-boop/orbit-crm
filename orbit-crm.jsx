@@ -438,16 +438,35 @@ table.tbl { width:100%; border-collapse: collapse; font-size:13px; }
 .seg button.on { background: var(--panel); color:var(--ink); box-shadow: var(--shadow); }
 
 /* slideover + modal */
-.scrim { position:fixed; inset:0; background: rgba(10,14,20,.44); backdrop-filter: blur(2px); z-index: 60;
-  animation: fade .15s ease; }
+.scrim { position:fixed; inset:0; background: rgba(10,14,20,.65); backdrop-filter: blur(4px); z-index: 9999;
+  animation: fade .15s ease; opacity: 1; }
 @keyframes fade { from { opacity:0; } }
-.slideover { position:fixed; top:0; right:0; height:100vh; width: min(680px, 96vw); background:var(--panel);
-  border-left:1px solid var(--line); z-index: 61; box-shadow: var(--shadow-lg); display:flex; flex-direction:column;
+.slideover { position:fixed; top:0; right:0; height:100vh; width: min(680px, 96vw); background-color: #ffffff;
+  color: var(--ink, #171B24); border-left:1px solid var(--line, #E7EAF0); z-index: 10000; opacity: 1; box-shadow: var(--shadow-lg); display:flex; flex-direction:column;
   animation: slidein .2s cubic-bezier(.4,0,.2,1); }
 @keyframes slidein { from { transform: translateX(30px); opacity:.6; } }
-.modal { position:fixed; z-index:61; top:50%; left:50%; transform:translate(-50%,-50%);
-  width: min(620px, 95vw); max-height: 92vh; background:var(--panel); border:1px solid var(--line);
-  border-radius:16px; box-shadow: var(--shadow-lg); display:flex; flex-direction:column; animation: pop .16s ease; }
+.modal { position:fixed; z-index:10000; top:50%; left:50%; transform:translate(-50%,-50%);
+  width: min(620px, 95vw); max-height: 92vh; background-color: #ffffff; color: var(--ink, #171B24); border:1px solid var(--line, #E7EAF0);
+  border-radius:16px; box-shadow: var(--shadow-lg); opacity: 1; display:flex; flex-direction:column; animation: pop .16s ease; }
+
+.orbit[data-theme="dark"] .slideover, .slideover[data-theme="dark"] {
+  background-color: #1a1a2e !important;
+  color: #E7EBF2 !important;
+  border-left-color: #262C36 !important;
+}
+.orbit[data-theme="dark"] .modal, .modal[data-theme="dark"] {
+  background-color: #1a1a2e !important;
+  color: #E7EBF2 !important;
+  border-color: #262C36 !important;
+}
+.orbit[data-theme="light"] .slideover, .slideover[data-theme="light"] {
+  background-color: #ffffff !important;
+  color: #171B24 !important;
+}
+.orbit[data-theme="light"] .modal, .modal[data-theme="light"] {
+  background-color: #ffffff !important;
+  color: #171B24 !important;
+}
 @keyframes pop { from { transform: translate(-50%,-46%); opacity:.7; } }
 .sheet-head { padding: 16px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
 .sheet-body { padding: 18px 20px; overflow-y:auto; flex:1; }
@@ -561,16 +580,16 @@ function Modal({ children, onClose, wide }) {
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
+  const target = (typeof document !== "undefined" && (document.querySelector(".orbit") || document.body)) || null;
+
   const content = (
     <>
-      <div className="scrim" onClick={onClose} />
-      <div className="modal" style={wide ? { width: "min(880px,95vw)" } : undefined} role="dialog">{children}</div>
+      <div className="scrim" onClick={onClose} style={{ zIndex: 9999, opacity: 1 }} />
+      <div className="modal" style={{ zIndex: 10000, opacity: 1, backgroundColor: "var(--panel, #ffffff)", ...(wide ? { width: "min(880px,95vw)" } : {}) }} role="dialog">{children}</div>
     </>
   );
 
-  return typeof document !== "undefined" && document.body
-    ? createPortal(content, document.body)
-    : content;
+  return target ? createPortal(content, target) : content;
 }
 
 function SlideOver({ children, onClose }) {
@@ -580,16 +599,16 @@ function SlideOver({ children, onClose }) {
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
+  const target = (typeof document !== "undefined" && (document.querySelector(".orbit") || document.body)) || null;
+
   const content = (
     <>
-      <div className="scrim" onClick={onClose} />
-      <div className="slideover" role="dialog">{children}</div>
+      <div className="scrim" onClick={onClose} style={{ zIndex: 9999, opacity: 1 }} />
+      <div className="slideover" style={{ zIndex: 10000, opacity: 1, backgroundColor: "var(--panel, #ffffff)" }} role="dialog">{children}</div>
     </>
   );
 
-  return typeof document !== "undefined" && document.body
-    ? createPortal(content, document.body)
-    : content;
+  return target ? createPortal(content, target) : content;
 }
 
 function Field({ label, hint, children, full }) {

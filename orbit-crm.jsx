@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   LayoutDashboard, Users, KanbanSquare, CheckSquare, BarChart3, Settings as SettingsIcon,
   Calendar as CalendarIcon, Search, Plus, Sun, Moon, Star, Phone, Mail, Link,
@@ -559,12 +560,17 @@ function Modal({ children, onClose, wide }) {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
-  return (
+
+  const content = (
     <>
       <div className="scrim" onClick={onClose} />
       <div className="modal" style={wide ? { width: "min(880px,95vw)" } : undefined} role="dialog">{children}</div>
     </>
   );
+
+  return typeof document !== "undefined" && document.body
+    ? createPortal(content, document.body)
+    : content;
 }
 
 function SlideOver({ children, onClose }) {
@@ -573,12 +579,17 @@ function SlideOver({ children, onClose }) {
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
-  return (
+
+  const content = (
     <>
       <div className="scrim" onClick={onClose} />
       <div className="slideover" role="dialog">{children}</div>
     </>
   );
+
+  return typeof document !== "undefined" && document.body
+    ? createPortal(content, document.body)
+    : content;
 }
 
 function Field({ label, hint, children, full }) {
@@ -2015,8 +2026,19 @@ function download(name, text, type = "text/plain") {
     const blob = new Blob([text], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = name; document.body.appendChild(a); a.click();
-    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    a.href = url;
+    a.download = name;
+    a.style.display = "none";
+    if (typeof document !== "undefined" && document.body) {
+      document.body.appendChild(a);
+    }
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) {
+        a.parentNode.removeChild(a);
+      }
+      URL.revokeObjectURL(url);
+    }, 200);
   } catch (e) { console.error(e); }
 }
 
@@ -2874,8 +2896,8 @@ function useContacts(db, update, toast) {
     updateContact(id, patch, activity);
     dbApi.updateContact(id, {
       attempts: patch.attempts, conversations: patch.conversations,
-      first_call_date: patch.firstCallDate, last_call_date: patch.lastCallDate, last_outcome: patch.lastOutcome,
-      call_status: patch.callStatus, next_call_date: patch.nextCallDate, next_call_time: patch.nextCallTime,
+      last_call_date: patch.lastCallDate, last_outcome: patch.lastOutcome,
+      call_status: patch.callStatus, next_call_date: patch.nextCallDate,
       phone: patch.phone, email: patch.email
     }).catch(console.error);
     dbApi.addActivity(id, mapActivityToSupabase(activity)).catch(console.error);

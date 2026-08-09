@@ -22,6 +22,39 @@ const isUuid = (id) => typeof id === 'string' && id.length === 36 && id.includes
 
 // --- CONTACTS ---
 
+const VALID_CONTACT_COLUMNS = new Set([
+  'id', 'business_id', 'name', 'email', 'phone', 'company', 'location', 
+  'industry_id', 'source_id', 'priority', 'authority', 'call_status', 
+  'attempts', 'conversations', 'last_call_date', 'last_outcome', 
+  'next_call_date', 'notes', 'tags', 'lead_list_id', 'user_id', 'updated_at'
+]);
+
+const CAMEL_TO_SNAKE_CONTACT = {
+  businessId: 'business_id',
+  industryId: 'industry_id',
+  sourceId: 'source_id',
+  callStatus: 'call_status',
+  lastCallDate: 'last_call_date',
+  lastOutcome: 'last_outcome',
+  nextCallDate: 'next_call_date',
+  leadListId: 'lead_list_id',
+  listId: 'lead_list_id',
+  contactName: 'name',
+  updatedAt: 'updated_at',
+  userId: 'user_id'
+};
+
+const cleanContactPatch = (patch) => {
+  const cleaned = {};
+  for (const [key, value] of Object.entries(patch || {})) {
+    const dbKey = CAMEL_TO_SNAKE_CONTACT[key] || key;
+    if (VALID_CONTACT_COLUMNS.has(dbKey) && value !== undefined) {
+      cleaned[dbKey] = value;
+    }
+  }
+  return cleaned;
+};
+
 export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50, search = '', callStatus = '', orderBy = 'created_at' }) => {
   console.log("getContacts called with:", { businessId, page, pageSize, search });
   const uid = await getUid();
@@ -68,7 +101,10 @@ export const createContact = async (data) => {
 export const updateContact = async (id, patch) => {
   if (!isUuid(id)) return { data: null, error: null };
   const uid = await getUid();
-  return handleResponse(await supabase.from('contacts').update(patch).eq('id', id).eq('user_id', uid).select().maybeSingle());
+  console.log("updateContact patch object before cleaning:", patch);
+  const cleanedPatch = cleanContactPatch(patch);
+  console.log("updateContact cleaned patch sent to Supabase:", cleanedPatch);
+  return handleResponse(await supabase.from('contacts').update(cleanedPatch).eq('id', id).eq('user_id', uid).select().maybeSingle());
 };
 
 export const deleteContact = async (id) => {
@@ -78,7 +114,10 @@ export const deleteContact = async (id) => {
 
 export const bulkUpdateContacts = async (ids, patch) => {
   const uid = await getUid();
-  return handleResponse(await supabase.from('contacts').update(patch).in('id', ids).eq('user_id', uid));
+  console.log("bulkUpdateContacts patch object before cleaning:", patch);
+  const cleanedPatch = cleanContactPatch(patch);
+  console.log("bulkUpdateContacts cleaned patch sent to Supabase:", cleanedPatch);
+  return handleResponse(await supabase.from('contacts').update(cleanedPatch).in('id', ids).eq('user_id', uid));
 };
 
 export const bulkDeleteContacts = async (ids) => {

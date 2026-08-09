@@ -35,7 +35,10 @@ export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50,
   if (listId && listId !== 'all') query = query.eq('lead_list_id', listId);
   if (callStatus && callStatus !== 'all') query = query.eq('call_status', callStatus);
   if (search) {
-    query = query.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    const term = String(search).trim().replace(/[%_,]/g, '');
+    if (term) {
+      query = query.or(`name.ilike.%${term}%,company.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`);
+    }
   }
 
   query = query.order(orderBy, { ascending: false }).range(from, to);
@@ -294,6 +297,13 @@ export const exportContacts = async (businessId) => {
 
   // No pagination, full export
   return handleResponse(await query);
+};
+
+export const getLeadLists = async () => {
+  const uid = await getUid();
+  const res = await supabase.from('lead_lists').select('*').eq('user_id', uid);
+  console.log('getLeadLists raw Supabase response:', res.data, res.error);
+  return handleResponse(res);
 };
 
 export const createLeadList = async (data) => {

@@ -1,3 +1,17 @@
+export const mapLeadListToLocal = (l) => ({
+  id: String(l.id),
+  name: l.name || '',
+  businessId: l.business_id || l.businessId || 'b_23labs',
+  industry: l.industry || '',
+  subIndustry: l.sub_industry || l.subIndustry || '',
+  source: l.source || '',
+  location: l.location || '',
+  folderId: l.folder_id || l.folderId || '',
+  status: l.status || 'Active',
+  createdAt: l.created_at || l.createdAt || '',
+  lastActivity: l.last_activity || l.lastActivity || '',
+});
+
 export const mapContactToLocal = (s) => ({
   id: s.id,
   businessId: s.business_id,

@@ -12,9 +12,6 @@ import {
   Rows3, ThumbsDown, Info, ArrowLeft, CircleSlash, MoveRight, Contact as ContactIcon,
   CalendarPlus, Save, Eraser, Snowflake, LogOut
 } from "lucide-react";
-
-const SafeKanbanSquare = KanbanSquare || LayoutDashboard;
-const SafeContactIcon = ContactIcon || Users;
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Legend
@@ -24,8 +21,11 @@ import * as XLSX from "xlsx";
 import { supabase } from "./src/lib/supabase";
 import { getSession, onAuthChange, signOut } from "./src/lib/auth";
 import LoginScreen from "./src/components/LoginScreen";
-import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, mapContactToLocal, mapActivityToLocal, mapActivityToSupabase } from "./src/lib/mappers";
+import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, mapContactToLocal, mapActivityToLocal, mapActivityToSupabase, mapLeadListToLocal } from "./src/lib/mappers";
 import * as dbApi from "./src/lib/db";
+
+const SafeKanbanSquare = KanbanSquare || LayoutDashboard;
+const SafeContactIcon = ContactIcon || Users;
 
 
 /* ============================================================================
@@ -268,7 +268,13 @@ function buildInitialState() {
     lossReasons: DEFAULT_LOSS_REASONS,
     leads,
     tasks: seedTasks(leads),
+    folders: [],
+    lists: [],
+    imports: [],
     settings: { coldDays: 7, theme: localStorage.getItem("orbit_theme") || "light" },
+    dnc: { phones: {}, emails: {} },
+    contactFilters: [],
+    mappingTemplates: [],
   };
 }
 
@@ -1941,7 +1947,7 @@ function LeadsWorkspace({ db, lk, defaultView, onOpen, onNew, onMove, onToggleFa
       <div className="toolbar">
         <div className="seg">
           <button className={clsx(view === "table" && "on")} onClick={() => setView("table")}><Users size={14} />Table</button>
-          <button className={clsx(view === "kanban" && "on")} onClick={() => setView("kanban")}><KanbanSquare size={14} />Board</button>
+          <button className={clsx(view === "kanban" && "on")} onClick={() => setView("kanban")}><SafeKanbanSquare size={14} />Board</button>
         </div>
         <Select value={f.business} onChange={e => setF(s => ({ ...s, business: e.target.value }))}>
           <option value="all">All businesses</option>{db.businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -2088,10 +2094,10 @@ export default function App() {
           industries: industries || [],
           sources: sources || [],
           folders: folders || [],
-          lists: (lists || []).map(l => ({ ...l, id: String(l.id) })),
+          lists: (lists || []).map(mapLeadListToLocal),
           imports: imports || [],
-          leads: leads || [],
-          tasks: tasks || [],
+          leads: (leads || []).map(mapLeadToLocal),
+          tasks: (tasks || []).map(mapTaskToLocal),
           lossReasons: DEFAULT_LOSS_REASONS,
           settings: { coldDays: 7, theme: localStorage.getItem("orbit_theme") || "light" },
           dnc: { phones: {}, emails: {} },
@@ -2128,6 +2134,7 @@ export default function App() {
   /* ---- cold calling module ---- */
   const cx = useContacts(db, update, toast);
   const [openContactId, setOpenContactId] = useState(null);
+  const [openContactData, setOpenContactData] = useState(null);
   const [listFilter, setListFilter] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [logCtx, setLogCtx] = useState(null);
@@ -2135,7 +2142,25 @@ export default function App() {
   const [queueSpec, setQueueSpec] = useState(null);
   const [confirmCfg, setConfirmCfg] = useState(null);
   const askConfirm = useCallback((cfg) => setConfirmCfg(cfg), []);
-  const startQueue = useCallback((spec) => { setQueueSpec(spec); setNav("call_queue"); setOpenContactId(null); }, []);
+  const startQueue = useCallback((spec) => { setQueueSpec(spec); setNav("call_queue"); setOpenContactId(null); setOpenContactData(null); }, []);
+
+  useEffect(() => {
+    if (!openContactId) {
+      setOpenContactData(null);
+      return;
+    }
+    const local = cx.contacts?.find(c => c.id === openContactId);
+    if (local) {
+      setOpenContactData(local);
+      return;
+    }
+    let cancelled = false;
+    dbApi.getContactById(openContactId).then(res => {
+      if (!cancelled && res.data) setOpenContactData(mapContactToLocal(res.data));
+    }).catch(console.error);
+    return () => { cancelled = true; };
+  }, [openContactId, cx.contacts]);
+
   const exportContacts = useCallback((rows, label) => {
     const data = rows.map(c => ({ company: c.company, first_name: c.firstName, last_name: c.lastName, job_title: c.jobTitle, phone: c.phone, secondary_phone: c.phone2, email: c.email, website: c.website, suburb: c.suburb, state: c.state, postcode: c.postcode, industry: c.industry, sub_industry: c.subIndustry, business: (lk.biz(c.businessId)?.name || ""), call_status: c.callStatus, attempts: c.attempts, conversations: c.conversations, last_outcome: c.lastOutcome, last_call: c.lastCallDate, next_call: c.nextCallDate, priority: c.priority, notes: (c.notes || "").replace(/\n/g, " ") }));
     download("orbit-" + label + "-" + todayISO() + ".csv", Papa.unparse(data), "text/csv");
@@ -2144,7 +2169,7 @@ export default function App() {
   if (!session) return <LoginScreen />;
   if (!db) return <div style={{ padding: 40, fontFamily: "Inter, sans-serif" }}>Loading…</div>;
 
-  const theme = localStorage.getItem("orbit_theme") || db.settings.theme;
+  const theme = localStorage.getItem("orbit_theme") || db.settings?.theme || "light";
   const openLead = db.leads.find(l => l.id === openLeadId) || null;
 
   /* ---- lead handlers ---- */
@@ -2330,8 +2355,8 @@ export default function App() {
     tasks: db.tasks.filter(t => t.status !== "done" && daysBetween(todayISO(), t.dueDate) <= 0).length,
     cold: cx.contacts ? cx.contacts.filter(isColdContact).length : 0,
   };
-  const openContact = cx.contacts ? cx.contacts.find(c => c.id === openContactId) : null;
-  const contactsReady = cx.cloaded && cx.contacts;
+  const openContact = openContactData;
+  const contactsReady = cx.cloaded && cx.cdb;
   const pageTitle = NAV.find(n => n.key === nav)?.label;
 
   if (!loaded || !db) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f0f0f', color: '#fff' }}>Loading workspace...</div>;
@@ -2421,7 +2446,7 @@ export default function App() {
                 !contactsReady ? <div style={{ padding: 40, color: "var(--muted)", fontSize: 14 }}>Loading contacts…</div> : (
                   <>
                     {cx.storageWarn && <div className="warn-banner"><AlertTriangle size={15} />This dataset is large for in-browser storage. Auto-save may be partial — use Settings → Backup, or export, to keep a durable copy.</div>}
-                    {nav === "cold" && <ColdView cx={cx} lk={lk} onOpenContact={setOpenContactId} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} />}
+                    {nav === "cold" && <ColdView cx={cx} lk={lk} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} refresh={refresh} />}
                     {nav === "contact_lists" && <ContactListsView cx={cx} lk={lk} refreshTrigger={refresh} onRefresh={() => setRefresh(r => r + 1)} onOpenList={(id) => { setNav("all_contacts"); setListFilter(id); }} onStartQueue={startQueue} onImport={() => setImportOpen(true)} onExportList={(id) => exportContacts(cx.contacts.filter(c => c.listIds.includes(id)), "list")} confirm={askConfirm} />}
                     {nav === "all_contacts" && <AllContactsView cx={cx} lk={lk} initialFilter={listFilter ? { list: listFilter } : null} onOpenContact={setOpenContactId} onStartQueue={startQueue} onExport={exportContacts} confirm={askConfirm} refresh={refresh} />}
                     {nav === "call_queue" && <CallQueueView cx={cx} lk={lk} startSpec={queueSpec} clearSpec={() => setQueueSpec(null)} confirm={askConfirm} />}
@@ -2798,13 +2823,13 @@ function useContacts(db, update, toast) {
   const addContacts = (list) => setContacts(cs => [...list, ...cs]);
 
   /* ---- DNC ---- */
-  const isDNC = (phone, email) => { const p = normPhone(phone), e = normEmail(email); return (p && cdb.dnc.phones[p]) || (e && cdb.dnc.emails[e]); };
+  const isDNC = (phone, email) => { if (!cdb) return false; const p = normPhone(phone), e = normEmail(email); return (p && cdb.dnc.phones[p]) || (e && cdb.dnc.emails[e]); };
   const registerDNC = (phone, email) => cupdate(n => { const p = normPhone(phone), e = normEmail(email); if (p) n.dnc.phones[p] = 1; if (e) n.dnc.emails[e] = 1; });
 
   /* ---- convert to lead ---- */
   const convertContact = (id, opts = {}) => {
-    const c = contacts.find(x => x.id === id); if (!c) return;
-    const ind = db.industries.find(i => (i.name || "").toLowerCase() === (c.industry || "").toLowerCase());
+    const c = contacts.find(x => x.id === id); if (!c || !db) return;
+    const ind = (db.industries || []).find(i => (i.name || "").toLowerCase() === (c.industry || "").toLowerCase());
     const interactions = (c.activity || []).filter(a => a.type === "call").map(a => ({ id: uid("i"), type: "call", date: a.date, notes: (a.outcome ? a.outcome + ": " : "") + (a.notes || ""), outcome: a.outcome || "", followUpDate: a.followUp || "" }));
     const lead = {
       id: uid("lead"), businessId: c.businessId || "b_23labs", industryId: ind ? ind.id : "ind_8",
@@ -2835,7 +2860,7 @@ function useContacts(db, update, toast) {
     if (!c) return;
     
     const channel = data.channel || "Call";
-    const meta = data.outcome ? outcomeMeta(data.outcome, cdb.customOutcomes) : { status: "Attempted", reached: false, rule: {} };
+    const meta = data.outcome ? outcomeMeta(data.outcome, cdb?.customOutcomes || []) : { status: "Attempted", reached: false, rule: {} };
     let nextCallDate = data.followUpDate || "";
     if (!nextCallDate && meta.rule && meta.rule.days) nextCallDate = addBusinessDays(todayISO(), meta.rule.days);
     const chanType = channel === "Email" ? "email" : channel === "LinkedIn" ? "linkedin" : channel === "Text" ? "text" : "call";
@@ -2958,7 +2983,7 @@ function listStats(contacts, listId) {
 
 /* ============================ Contact Lists view ============================ */
 function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExportList, refreshTrigger, onRefresh }) {
-  const { cdb, contacts } = cx;
+  const { cdb, contacts, cupdate } = cx;
   const [newList, setNewList] = useState(null);
   const [newFolder, setNewFolder] = useState("");
   const [loading, setLoading] = useState(true);
@@ -2972,39 +2997,31 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
       console.log("ContactListsView: fetching lead_lists from Supabase...");
       setLoading(true);
       setErrorState(null);
-      const timer = setTimeout(() => {
-        if (active) {
-          setErrorState("No lists found. Import a CSV to create a list.");
-          setLoading(false);
-        }
-      }, 5000);
       try {
-        const { data, error } = await supabase.from("lead_lists").select("*");
+        const { data, error } = await dbApi.getLeadLists();
         console.log("ContactListsView raw Supabase response:", data, error);
-        if (active) {
-          if (error) throw error;
-          setLists(data || []);
-          if (!data || data.length === 0) {
-            setErrorState("No lists found. Import a CSV to create a list.");
-          }
-          setLoading(false);
-          clearTimeout(timer);
-        }
+        if (!active) return;
+        if (error) throw error;
+        const mapped = (data || []).map(mapLeadListToLocal);
+        setLists(mapped);
+        cupdate(n => { n.lists = mapped; });
       } catch (err) {
         if (active) {
           console.error("Failed to fetch lead_lists:", err);
-          setErrorState("No lists found. Import a CSV to create a list.");
-          setLoading(false);
-          clearTimeout(timer);
+          setErrorState(err.message || "Failed to load contact lists.");
         }
+      } finally {
+        if (active) setLoading(false);
       }
     };
     fetchLists();
     return () => { active = false; };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, cupdate]);
+
+  if (!cdb) return <div style={{ padding: 20, color: "var(--muted)" }}>Loading lists…</div>;
 
   const foldered = { "": [] };
-  cdb.folders.forEach(f => foldered[f.id] = []);
+  (cdb.folders || []).forEach(f => foldered[f.id] = []);
   lists.forEach(l => { (foldered[l.folderId] || foldered[""]).push(l); });
 
   const Card = ({ l }) => {
@@ -3063,12 +3080,12 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
           <button className="btn" onClick={() => { if (newFolder.trim()) { cx.createFolder(newFolder.trim()); setNewFolder(""); } }}><FolderPlus size={15} /></button>
         </div>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: "var(--muted)" }}>{contacts.length.toLocaleString()} contacts · {cdb.lists.length} lists</span>
+        <span style={{ fontSize: 12, color: "var(--muted)" }}>{contacts.length.toLocaleString()} contacts · {lists.length} lists</span>
       </div>
 
       {loading && <div style={{ padding: "20px 0", color: "var(--muted)" }}>Loading lists...</div>}
-      {errorState && <Empty icon={Database} title="No lists found" sub="Import a CSV to create a list." action={<button className="btn btn-primary" onClick={onImport}><Upload size={15} />Import contacts</button>} />}
-      {!loading && !errorState && cdb.lists.length === 0 && <Empty icon={Database} title="No contact lists yet" sub="Import a CSV or XLSX to build your first calling list." action={<button className="btn btn-primary" onClick={onImport}><Upload size={15} />Import contacts</button>} />}
+      {errorState && !loading && <div style={{ padding: "20px 0", color: "var(--red)" }}>{errorState}</div>}
+      {!loading && !errorState && lists.length === 0 && <Empty icon={Database} title="No contact lists yet" sub="Import a CSV or XLSX to build your first calling list." action={<button className="btn btn-primary" onClick={onImport}><Upload size={15} />Import contacts</button>} />}
       {Object.entries(foldered).map(([fid, lists]) => {
         if (!lists.length) return null;
         const folder = cdb.folders.find(f => f.id === fid);
@@ -3295,7 +3312,7 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
       if (!listId) {
         console.error("Failed to create list during import:", nl.error);
       } else {
-        cx.createList({ id: listId, name: listData.name, businessId: ctx.businessId, industry: ctx.industry, source: ctx.source, status: "Active" });
+        cx.createList(mapLeadListToLocal(nl.data));
       }
     }
     else cx.updateList(listId, { status: "Active", lastActivity: nowISO() });
@@ -3560,17 +3577,19 @@ function AllContactsView({ cx, lk, initialFilter, onOpenContact, onStartQueue, o
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
   useEffect(() => { setPage(0); setSelected(new Set()); }, [f, dq]);
-  useEffect(() => { setPage(0); setSelected(new Set()); }, [f, dq]);
 
-  const listName = useMemo(() => { const m = new Map(cdb.lists.map(l => [l.id, l.name])); return (id) => m.get(id) || ""; }, [cdb.lists]);
+  const listName = useMemo(() => { const m = new Map((cdb?.lists || []).map(l => [l.id, l.name])); return (id) => m.get(id) || ""; }, [cdb?.lists]);
+  const industries = useMemo(() => Array.from(new Set(contacts.map(c => c.industry).filter(Boolean))).sort(), [contacts]);
+
+  if (!cdb) return <div style={{ padding: 20, color: "var(--muted)" }}>Loading contacts…</div>;
+
   const helpers = { listName, bizName: (id) => lk.biz(id)?.name || "—" };
 
-  const filtered = contacts; // server side filtering means `contacts` is already filtered
-  const sorted = contacts; // sort is also mostly handled server side or could be done here, but we paginate on the server so sorting here only sorts the current page!
+  const filtered = contacts;
+  const sorted = contacts;
   const pageRows = contacts;
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const visibleCols = ALL_COLUMNS.filter(c => (cdb.settings.columns || []).includes(c.key));
-  const industries = useMemo(() => Array.from(new Set(contacts.map(c => c.industry).filter(Boolean))).sort(), [contacts]);
 
   const allFilteredSelected = filtered.length > 0 && selected.size === filtered.length;
   const toggleAll = () => setSelected(allFilteredSelected ? new Set() : new Set(filtered.map(c => c.id)));
@@ -4154,7 +4173,7 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
 }
 
 /* ============================ Cold section ============================ */
-function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refresh }) {
+function ColdView({ cx, lk, onStartQueue, onExport, confirm, refresh }) {
   const { cdb } = cx;
   const [f, setF] = useState({ business: "all", industry: "all", list: "all", state: "all", priority: "all", added: "all", hasPhone: false, hasEmail: false });
   const [q, setQ] = useState("");
@@ -4163,13 +4182,16 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
   const pageSize = 50;
   const [selected, setSelected] = useState(new Set());
   const [bulk, setBulk] = useState(null);
-
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [logCtx, setLogCtx] = useState(null);
+  const [editContact, setEditContact] = useState(null);
   const [cold, setCold] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [errorState, setErrorState] = useState(null);
 
   const loadCold = useCallback(async () => {
+    if (!cdb) return;
     setLoading(true);
     setErrorState(null);
     try {
@@ -4186,9 +4208,7 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
       } else if (data) {
         setCold(data.map(mapContactToLocal));
         setTotalCount(count || 0);
-        if (data.length === 0) {
-           setErrorState("No cold contacts found");
-        }
+        if (data.length === 0) setErrorState("No cold contacts found");
       } else {
         setErrorState("No cold contacts found");
       }
@@ -4197,7 +4217,7 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
     } finally {
       setLoading(false);
     }
-  }, [f.business, dq, page, pageSize, refresh]);
+  }, [f.business, dq, page, pageSize, refresh, cdb]);
 
   useEffect(() => { loadCold(); }, [loadCold]);
   useEffect(() => { setPage(0); setSelected(new Set()); }, [f, dq]);
@@ -4208,7 +4228,9 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
   const allSel = rows.length > 0 && selected.size === rows.length;
   const toggleAll = () => setSelected(allSel ? new Set() : new Set(rows.map(c => c.id)));
   const toggleOne = (id) => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const listName = (id) => cdb.lists.find(l => l.id === id)?.name || "";
+  const listName = (id) => (cdb?.lists || []).find(l => l.id === id)?.name || "";
+
+  if (!cdb) return <div style={{ padding: 20, color: "var(--muted)" }}>Loading cold contacts…</div>;
 
   return (
     <div>
@@ -4245,7 +4267,7 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
           </tr></thead>
           <tbody>
             {rows.map(c => (
-              <tr key={c.id} className={clsx(selected.has(c.id) && "sel")} onClick={() => onOpenContact(c.id)}>
+              <tr key={c.id} className={clsx(selected.has(c.id) && "sel", selectedContact?.id === c.id && "sel")} onClick={() => setSelectedContact(c)} style={{ cursor: "pointer" }}>
                 <td onClick={e => { e.stopPropagation(); toggleOne(c.id); }}><input type="checkbox" className="ck" checked={selected.has(c.id)} readOnly /></td>
                 <td>{fullName(c) || "—"}</td><td style={{ fontWeight: 550 }}>{c.company}</td><td>{c.phone || "—"}</td><td>{c.email || "—"}</td>
                 <td>{c.industry || "—"}</td><td>{lk.biz(c.businessId)?.name || "—"}</td><td>{c.listIds.map(listName).filter(Boolean).join(", ") || "—"}</td>
@@ -4280,6 +4302,22 @@ function ColdView({ cx, lk, onOpenContact, onStartQueue, onExport, confirm, refr
         </div>
       )}
       {bulk && <BulkPrompt kind={bulk} cx={cx} count={selected.size} onClose={() => setBulk(null)} onApply={(fn, patch) => { cx.bulkUpdate(selected, fn, patch); setBulk(null); setSelected(new Set()); }} />}
+
+      {selectedContact && (
+        <ContactDetail
+          contact={selectedContact}
+          cx={cx}
+          lk={lk}
+          onClose={() => setSelectedContact(null)}
+          onConvert={(id) => cx.convertContact(id)}
+          onLog={(c) => setLogCtx(c)}
+          onStartQueue={onStartQueue}
+          onEdit={(c) => setEditContact(c)}
+          confirm={confirm}
+        />
+      )}
+      {logCtx && <LogOutcomeModal contact={logCtx} cx={cx} onClose={() => setLogCtx(null)} onLogged={() => { setLogCtx(null); loadCold(); }} />}
+      {editContact && <ContactEditModal contact={editContact} cx={cx} onClose={() => setEditContact(null)} />}
     </div>
   );
 }

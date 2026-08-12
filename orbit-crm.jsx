@@ -2061,6 +2061,73 @@ function download(name, text, type = "text/plain") {
   } catch (e) { console.error(e); }
 }
 
+function safeCopyToClipboard(text, onSuccess) {
+  if (!text) return;
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(() => { if (onSuccess) onSuccess(); })
+        .catch(e => {
+          console.warn("navigator.clipboard.writeText failed, using fallback:", e);
+          fallbackCopyText(text, onSuccess);
+        });
+      return;
+    }
+  } catch (e) {
+    console.warn("navigator.clipboard error:", e);
+  }
+  fallbackCopyText(text, onSuccess);
+}
+
+function fallbackCopyText(text, onSuccess) {
+  try {
+    if (typeof document === "undefined" || !document.body) return;
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.setAttribute("readonly", "");
+    el.style.position = "fixed";
+    el.style.left = "-9999px";
+    el.style.top = "-9999px";
+    document.body.appendChild(el);
+
+    if (el && el.parentNode === document.body) {
+      try {
+        el.select();
+        const range = document.createRange();
+        if (el && el.parentNode) {
+          try {
+            range.selectNode(el);
+          } catch (e) {
+            console.warn('selectNode failed', e);
+          }
+        }
+        const selection = window.getSelection();
+        if (selection) {
+          try {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } catch (e) {
+            console.warn('Selection addRange failed', e);
+          }
+        }
+        document.execCommand('copy');
+      } catch (e) {
+        console.warn('Fallback selection/copy failed', e);
+      }
+      try {
+        if (el && el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      } catch (e) {
+        console.warn('removeChild failed', e);
+      }
+      if (onSuccess) onSuccess();
+    }
+  } catch (e) {
+    console.warn('fallbackCopyText failed', e);
+  }
+}
+
 export default function App() {
   const [db, setDb] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -4190,7 +4257,7 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
         </div>
 
         <div 
-          onClick={() => { if (c.phone) { navigator.clipboard.writeText(c.phone); cx.toast("Number copied!"); } }}
+          onClick={() => { if (c.phone) { safeCopyToClipboard(c.phone, () => cx.toast("Number copied!")); } }}
           style={{ display: "block", textAlign: "center", fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk'", color: "var(--accent-ink)", textDecoration: "none", padding: "10px 0 16px", cursor: "pointer" }}
           title="Click to copy"
         >
@@ -4198,7 +4265,7 @@ function CallQueueView({ cx, lk, startSpec, clearSpec, confirm }) {
         </div>
 
         <div className="call-actions" style={{ marginBottom: 16 }}>
-          <button className="ca-btn primary" onClick={() => { if (c.phone) { navigator.clipboard.writeText(c.phone); cx.toast("Number copied!"); } }}><Copy size={18} />Copy</button>
+          <button className="ca-btn primary" onClick={() => { if (c.phone) { safeCopyToClipboard(c.phone, () => cx.toast("Number copied!")); } }}><Copy size={18} />Copy</button>
           <button className="ca-btn" onClick={() => setLogging(true)}><PhoneForwarded size={18} />Log outcome</button>
           <button className="ca-btn" onClick={() => confirm({ title: "Convert to lead?", body: c.company + " will join the sales pipeline.", confirmLabel: "Convert", onConfirm: () => { cx.convertContact(c.id); advance(); } })}><UserPlus size={18} />Convert</button>
           <button className="ca-btn" onClick={advance}><SkipForward size={18} />Skip</button>

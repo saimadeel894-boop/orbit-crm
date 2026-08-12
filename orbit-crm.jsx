@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
   LayoutDashboard, Users, KanbanSquare, CheckSquare, BarChart3, Settings as SettingsIcon,
@@ -2132,6 +2132,8 @@ export default function App() {
   const [db, setDb] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [nav, setNav] = useState("dashboard");
+  const [isNavPending, startNavTransition] = useTransition();
+  const [pendingNavKey, setPendingNavKey] = useState(null);
   const [openLeadId, setOpenLeadId] = useState(null);
   const [leadForm, setLeadForm] = useState(null);       // {} for new, lead for edit
   const [intForm, setIntForm] = useState(null);         // {lead, presetType}
@@ -2488,8 +2490,15 @@ export default function App() {
               {NAV.map((item, i) => item.group ? (
                 <div key={"g" + i} className="nav-group">{item.group}</div>
               ) : (
-                <button key={item.key} className={clsx("nav-item", nav === item.key && "active")}
-                  onClick={() => { setNav(item.key); setSidebarOpen(false); setListFilter(null); }}>
+                <button key={item.key} className={clsx("nav-item", (nav === item.key || (isNavPending && pendingNavKey === item.key)) && "active")}
+                  onClick={() => {
+                    setPendingNavKey(item.key);
+                    setSidebarOpen(false);
+                    startNavTransition(() => {
+                      setNav(item.key);
+                      setListFilter(null);
+                    });
+                  }}>
                   {(() => { const ItemIcon = item.icon || LayoutDashboard; return <ItemIcon size={17} />; })()} {item.label}
                   {item.key === "leads" && <span className="count">{counts.leads}</span>}
                   {item.key === "tasks" && counts.tasks > 0 && <span className="count">{counts.tasks}</span>}

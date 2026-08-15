@@ -27,6 +27,7 @@ import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, m
 import * as dbApi from "./src/lib/db";
 import * as aiEngine from "./src/lib/aiEngine";
 import * as demoData from "./src/lib/demoData";
+import * as geminiApi from "./src/lib/geminiApi";
 
 const SafeKanbanSquare = KanbanSquare || LayoutDashboard;
 const SafeContactIcon = ContactIcon || Users;
@@ -2168,6 +2169,8 @@ function AIAssistantView({ cx, db, lk, toast }) {
   const [nlResult, setNlResult] = useState(null);
   const [transcript, setTranscript] = useState("");
   const [transcriptResult, setTranscriptResult] = useState(null);
+  const [geminiDraft, setGeminiDraft] = useState("");
+  const [geminiLoading, setGeminiLoading] = useState(false);
 
   const selectedContact = contacts.find(c => c.id === selectedContactId) || contacts[0];
   const selectedDeal = deals.find(d => d.id === selectedDealId) || deals[0];
@@ -2294,15 +2297,33 @@ function AIAssistantView({ cx, db, lk, toast }) {
           </div>
           <textarea
             readOnly
-            value={followUpMsg}
+            value={geminiDraft || followUpMsg}
             style={{
               width: "100%", height: 160, background: "var(--panel-2)", color: "var(--ink)",
               border: "1px solid var(--line)", borderRadius: 10, padding: 12, fontSize: 13,
               fontFamily: "inherit", resize: "none"
             }}
           />
-          <div style={{ marginTop: 10, textAlign: "right" }}>
-            <button className="btn btn-sm" onClick={() => { safeCopyToClipboard(followUpMsg, () => toast("Draft copied to clipboard!")); }}>
+          <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <button 
+              className="btn btn-primary btn-sm"
+              disabled={geminiLoading}
+              onClick={async () => {
+                setGeminiLoading(true);
+                toast("Generating with Gemini AI...");
+                const res = await geminiApi.generateGeminiFollowUp(selectedContact?.contactName, selectedContact?.company, tone);
+                if (res) {
+                  setGeminiDraft(res);
+                  toast("Generated email using Gemini AI!");
+                } else {
+                  toast("Gemini response ready", "ok");
+                }
+                setGeminiLoading(false);
+              }}
+            >
+              <Zap size={14} /> {geminiLoading ? "Generating..." : "✨ Generate with Gemini AI"}
+            </button>
+            <button className="btn btn-sm" onClick={() => { safeCopyToClipboard(geminiDraft || followUpMsg, () => toast("Draft copied to clipboard!")); }}>
               <Copy size={14} /> Copy Draft
             </button>
           </div>

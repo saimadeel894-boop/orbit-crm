@@ -308,6 +308,7 @@ function buildInitialStateWithDemo() {
   }));
 
   return {
+    isDemo: true,
     businesses: [{ id: "b_default", name: "Apex Growth SaaS", color: "#4F6BFF" }],
     industries: [
       { id: "ind_tech", name: "Technology & SaaS" },
@@ -3425,7 +3426,16 @@ function useContacts(db, update, toast) {
       settings: { columns: ["company", "name", "phone", "industry", "location", "list", "callStatus", "attempts", "lastOutcome", "nextCall", "priority"], ...(db?.settings || {}) }
     };
     setCdb(meta); 
-    if (db) setCloaded(true);
+    if (db) {
+      setCloaded(true);
+      if (db.isDemo || db.businesses?.[0]?.id === "b_default") {
+        setContacts(demoData.DEMO_CONTACTS.map(mapContactToLocal));
+      } else {
+        dbApi.getAllContacts().then(({ data }) => {
+          if (data && data.length > 0) setContacts(data.map(mapContactToLocal));
+        });
+      }
+    }
   }, [db]);
 
   const cupdate = useCallback((mut) => setCdb(prev => { const n = structuredClone(prev); mut(n); return n; }), []);

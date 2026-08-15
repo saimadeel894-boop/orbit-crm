@@ -355,3 +355,62 @@ export const getAllQueueContacts = async () => {
   }
   return { data: allData, error: null };
 };
+
+// --- WORKSPACES & ORGANIZATIONS ---
+
+export const getWorkspaces = async () => {
+  const uid = await getUid();
+  return handleResponse(await supabase.from('workspaces').select('*').eq('owner_id', uid));
+};
+
+export const createWorkspace = async ({ name, slug, plan = 'pro', settings = {} }) => {
+  const uid = await getUid();
+  const { data, error } = await supabase
+    .from('workspaces')
+    .insert({ name, slug, owner_id: uid, plan, settings })
+    .select()
+    .single();
+
+  if (data) {
+    await supabase.from('workspace_members').insert({
+      workspace_id: data.id,
+      user_id: uid,
+      role: 'owner'
+    });
+  }
+  return { data, error };
+};
+
+export const getOrganizations = async (workspaceId = null) => {
+  const uid = await getUid();
+  let query = supabase.from('organizations').select('*');
+  if (workspaceId) {
+    query = query.eq('workspace_id', workspaceId);
+  } else {
+    query = query.eq('user_id', uid);
+  }
+  return handleResponse(await query.order('name', { ascending: true }));
+};
+
+export const createOrganization = async (data) => {
+  const uid = await getUid();
+  return handleResponse(
+    await supabase.from('organizations').insert({ ...data, user_id: uid }).select().single()
+  );
+};
+
+export const updateOrganization = async (id, patch) => {
+  if (!isUuid(id)) return { data: null, error: null };
+  const uid = await getUid();
+  return handleResponse(
+    await supabase.from('organizations').update(patch).eq('id', id).eq('user_id', uid).select().single()
+  );
+};
+
+export const deleteOrganization = async (id) => {
+  if (!isUuid(id)) return { data: null, error: null };
+  const uid = await getUid();
+  return handleResponse(
+    await supabase.from('organizations').delete().eq('id', id).eq('user_id', uid)
+  );
+};

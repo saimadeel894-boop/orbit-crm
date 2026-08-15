@@ -1,0 +1,103 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Orbit CRM SaaS REST API",
+    "description": "Commercial multi-tenant API for managing contacts, organizations, leads, pipelines, tasks, activity logs, and AI CRM workflows.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Orbit CRM Developer API Support",
+      "email": "api@orbitcrm.io",
+      "url": "https://orbitcrm.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://orbit-crm-tan.vercel.app/api/v1",
+      "description": "Production SaaS Server"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/workspaces": {
+      "get": {
+        "summary": "List User Workspaces",
+        "operationId": "listWorkspaces",
+        "responses": {
+          "200": {
+            "description": "A list of accessible workspaces"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Workspace",
+        "operationId": "createWorkspace",
+        "responses": {
+          "201": {
+            "description": "Workspace created successfully"
+          }
+        }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "summary": "Get Workspace Contacts",
+        "parameters": [
+          { "name": "workspaceId", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": {
+          "200": { "description": "Contacts retrieved successfully" }
+        }
+      },
+      "post": {
+        "summary": "Create Contact",
+        "responses": {
+          "201": { "description": "Contact created successfully" }
+        }
+      }
+    },
+    "/leads": {
+      "get": {
+        "summary": "Get Pipeline Leads & Deals",
+        "parameters": [
+          { "name": "workspaceId", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "stage", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Deals retrieved successfully" }
+        }
+      }
+    },
+    "/ai/summarize-lead": {
+      "post": {
+        "summary": "Generate AI Lead Summary & Score",
+        "responses": {
+          "200": { "description": "AI Summary generated" }
+        }
+      }
+    },
+    "/ai/deal-risk": {
+      "post": {
+        "summary": "Analyze Deal Risk & Recommend Next Steps",
+        "responses": {
+          "200": { "description": "Deal risk analysis generated" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

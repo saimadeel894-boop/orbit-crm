@@ -25,6 +25,8 @@ import LoginScreen from "./src/components/LoginScreen";
 import LandingPage from "./src/components/LandingPage";
 import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, mapContactToLocal, mapActivityToLocal, mapActivityToSupabase, mapLeadListToLocal } from "./src/lib/mappers";
 import * as dbApi from "./src/lib/db";
+import * as aiEngine from "./src/lib/aiEngine";
+import * as demoData from "./src/lib/demoData";
 
 const SafeKanbanSquare = KanbanSquare || LayoutDashboard;
 const SafeContactIcon = ContactIcon || Users;
@@ -2053,6 +2055,8 @@ const NAV = [
   { key: "tasks", label: "Tasks", icon: CheckSquare },
   { key: "calendar", label: "Calendar", icon: CalendarIcon },
   { key: "reports", label: "Reports", icon: BarChart3 },
+  { group: "Intelligence" },
+  { key: "ai_assistant", label: "AI Assistant", icon: Zap },
   { group: "Cold calling" },
   { key: "cold", label: "Cold", icon: Snowflake },
   { key: "contact_lists", label: "Contact Lists", icon: Database },
@@ -2061,6 +2065,7 @@ const NAV = [
   { key: "cold_dashboard", label: "Cold Dashboard", icon: Gauge },
   { key: "import_history", label: "Import History", icon: FileSpreadsheet },
   { group: "Workspace" },
+  { key: "pricing", label: "SaaS Plans", icon: Award },
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -2152,6 +2157,313 @@ function fallbackCopyText(text, onSuccess) {
   }
 }
 
+function AIAssistantView({ cx, db, lk, toast }) {
+  const contacts = cx.contacts || [];
+  const deals = db.leads || [];
+
+  const [selectedContactId, setSelectedContactId] = useState(contacts[0]?.id || "");
+  const [selectedDealId, setSelectedDealId] = useState(deals[0]?.id || "");
+  const [tone, setTone] = useState("professional");
+  const [nlQuery, setNlQuery] = useState("");
+  const [nlResult, setNlResult] = useState(null);
+  const [transcript, setTranscript] = useState("");
+  const [transcriptResult, setTranscriptResult] = useState(null);
+
+  const selectedContact = contacts.find(c => c.id === selectedContactId) || contacts[0];
+  const selectedDeal = deals.find(d => d.id === selectedDealId) || deals[0];
+
+  const summary = useMemo(() => {
+    return aiEngine.generateLeadSummary(selectedContact, selectedContact?.activity || []);
+  }, [selectedContact]);
+
+  const score = useMemo(() => {
+    return aiEngine.calculateLeadScore(selectedContact, selectedContact?.activity || [], db.tasks || []);
+  }, [selectedContact, db.tasks]);
+
+  const followUpMsg = useMemo(() => {
+    return aiEngine.generateFollowUpMessage(selectedContact, null, tone);
+  }, [selectedContact, tone]);
+
+  const dealRisk = useMemo(() => {
+    return aiEngine.analyzeDealRisk(selectedDeal, selectedDeal?.stage, 10, []);
+  }, [selectedDeal]);
+
+  const handleNLSearch = () => {
+    if (!nlQuery.trim()) return;
+    const res = aiEngine.parseNaturalLanguageQuery(nlQuery, contacts, deals);
+    setNlResult(res);
+  };
+
+  const handleProcessTranscript = () => {
+    if (!transcript.trim()) return;
+    const res = aiEngine.processMeetingTranscript(transcript);
+    setTranscriptResult(res);
+    toast("AI generated meeting summary & task recommendations");
+  };
+
+  return (
+    <div style={{ maxWidth: 1100, display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Natural Language Query Bar */}
+      <div className="card card-pad" style={{ background: "linear-gradient(135deg, var(--panel) 0%, var(--panel-2) 100%)" }}>
+        <div className="section-head" style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Zap size={18} style={{ color: "var(--accent)" }} />
+            <h3>AI Natural Language CRM Search</h3>
+          </div>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 14px" }}>
+          Query your CRM using natural language (e.g. <i>"contacts not contacted"</i>, <i>"high value deals"</i>, or <i>"proposal stage"</i>).
+        </p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Input 
+            value={nlQuery} 
+            onChange={e => setNlQuery(e.target.value)} 
+            placeholder="e.g. Show me leads not contacted recently or high value deals…" 
+            onKeyDown={e => e.key === "Enter" && handleNLSearch()}
+          />
+          <button className="btn btn-primary" onClick={handleNLSearch}><Zap size={15} />AI Query</button>
+        </div>
+        {nlResult && (
+          <div style={{ marginTop: 14, padding: 14, background: "var(--bg)", borderRadius: 10, border: "1px solid var(--line)" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--accent-ink)", marginBottom: 8 }}>{nlResult.explanation}</div>
+            {nlResult.contacts.length > 0 && (
+              <div style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+                <b>Matching Contacts:</b> {nlResult.contacts.map(c => c.contactName || c.company).join(", ")}
+              </div>
+            )}
+            {nlResult.deals.length > 0 && (
+              <div style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+                <b>Matching Deals:</b> {nlResult.deals.map(d => `${d.title} ($${(d.dealValue||0).toLocaleString()})`).join(", ")}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* Lead Summarizer & Score Inspector */}
+        <div className="card card-pad">
+          <div className="section-head" style={{ marginBottom: 12 }}>
+            <h3>AI Lead Summary & Score</h3>
+          </div>
+          <Field label="Select Prospect">
+            <Select value={selectedContactId} onChange={e => setSelectedContactId(e.target.value)}>
+              {contacts.map(c => <option key={c.id} value={c.id}>{c.contactName || c.company || "Contact"} — {c.company}</option>)}
+            </Select>
+          </Field>
+
+          {selectedContact && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: "50%",
+                  background: score.score > 75 ? "color-mix(in srgb, var(--good) 15%, transparent)" : "color-mix(in srgb, var(--warn) 15%, transparent)",
+                  color: score.score > 75 ? "var(--good)" : "var(--warn)",
+                  display: "grid", placeItems: "center", fontWeight: 700, fontSize: 18
+                }}>
+                  {score.score}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>Lead Intent Score ({score.score}/100)</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>{score.breakdown.join(" · ")}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, background: "var(--bg)", padding: 12, borderRadius: 10, border: "1px solid var(--line)", lineHeight: 1.5 }}>
+                {summary}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AI Follow-up Message Generator */}
+        <div className="card card-pad">
+          <div className="section-head" style={{ marginBottom: 12 }}>
+            <h3>AI Follow-up Draft Generator</h3>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {["professional", "casual", "urgent"].map(t => (
+              <button 
+                key={t} 
+                className={clsx("btn btn-sm", tone === t && "btn-primary")}
+                onClick={() => setTone(t)}
+                style={{ textTransform: "capitalize" }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <textarea
+            readOnly
+            value={followUpMsg}
+            style={{
+              width: "100%", height: 160, background: "var(--panel-2)", color: "var(--ink)",
+              border: "1px solid var(--line)", borderRadius: 10, padding: 12, fontSize: 13,
+              fontFamily: "inherit", resize: "none"
+            }}
+          />
+          <div style={{ marginTop: 10, textAlign: "right" }}>
+            <button className="btn btn-sm" onClick={() => { safeCopyToClipboard(followUpMsg, () => toast("Draft copied to clipboard!")); }}>
+              <Copy size={14} /> Copy Draft
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* Deal Risk Analyzer */}
+        <div className="card card-pad">
+          <div className="section-head" style={{ marginBottom: 12 }}>
+            <h3>AI Deal Risk & Action Recommender</h3>
+          </div>
+          <Field label="Select Pipeline Deal">
+            <Select value={selectedDealId} onChange={e => setSelectedDealId(e.target.value)}>
+              {deals.map(d => <option key={d.id} value={d.id}>{d.title} (${(d.dealValue||0).toLocaleString()})</option>)}
+            </Select>
+          </Field>
+          {selectedDeal && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{
+                padding: 12, borderRadius: 10, marginBottom: 10,
+                background: dealRisk.riskLevel === "High" ? "color-mix(in srgb, var(--bad) 12%, transparent)" : dealRisk.riskLevel === "Medium" ? "color-mix(in srgb, var(--warn) 12%, transparent)" : "color-mix(in srgb, var(--good) 12%, transparent)",
+                color: dealRisk.riskLevel === "High" ? "var(--bad)" : dealRisk.riskLevel === "Medium" ? "var(--warn)" : "var(--good)",
+                fontWeight: 600, fontSize: 13.5
+              }}>
+                {dealRisk.text}
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                <b>Recommended Next Action:</b> {dealRisk.action}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Meeting Transcript Converter */}
+        <div className="card card-pad">
+          <div className="section-head" style={{ marginBottom: 12 }}>
+            <h3>AI Meeting Transcript / Notes Processor</h3>
+          </div>
+          <textarea
+            value={transcript}
+            onChange={e => setTranscript(e.target.value)}
+            placeholder="Paste raw call notes or meeting transcripts here…"
+            style={{
+              width: "100%", height: 100, background: "var(--panel-2)", color: "var(--ink)",
+              border: "1px solid var(--line)", borderRadius: 10, padding: 10, fontSize: 13,
+              fontFamily: "inherit", resize: "none", marginBottom: 10
+            }}
+          />
+          <button className="btn btn-primary btn-sm" onClick={handleProcessTranscript}><FileText size={14} />Extract Summary & Tasks</button>
+          {transcriptResult && (
+            <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--ink-2)", background: "var(--bg)", padding: 10, borderRadius: 8, border: "1px solid var(--line)" }}>
+              <div><b>AI Summary:</b> {transcriptResult.summary}</div>
+              <div style={{ marginTop: 6 }}><b>Action Items:</b> {transcriptResult.actionItems.join("; ")}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SaaSPlansView({ currentPlan = "pro", toast }) {
+  return (
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: "10px 0" }}>
+      <div style={{ textAlign: "center", marginBottom: 30 }}>
+        <h2 style={{ fontSize: 28, marginBottom: 8 }}>Choose Your Orbit CRM Plan</h2>
+        <p style={{ color: "var(--muted)", fontSize: 15 }}>Scalable commercial plans for founders, agencies, and high-velocity sales teams.</p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+        {/* Free Plan */}
+        <div className="card card-pad" style={{ display: "flex", flexDirection: "column" }}>
+          <h3 style={{ fontSize: 20, marginBottom: 6 }}>Free Starter</h3>
+          <div style={{ fontSize: 26, fontWeight: 700, margin: "10px 0" }}>$0 <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>/ mo</span></div>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>For single founders testing outreach workflows.</p>
+          <ul style={{ paddingLeft: 18, fontSize: 13, color: "var(--ink-2)", display: "flex", flexDirection: "column", gap: 8, flex: 1, margin: "0 0 20px" }}>
+            <li>1 Workspace</li>
+            <li>Up to 2 Team Users</li>
+            <li>250 Contacts</li>
+            <li>Basic Kanban Pipeline</li>
+            <li>Standard CSV Export</li>
+          </ul>
+          <button className="btn" style={{ width: "100%", justifyContent: "center" }} onClick={() => toast("Currently on Free Starter plan")}>
+            {currentPlan === "free" ? "Current Plan" : "Downgrade"}
+          </button>
+        </div>
+
+        {/* Pro Plan (Featured) */}
+        <div className="card card-pad" style={{ display: "flex", flexDirection: "column", border: "2px solid var(--accent)", position: "relative" }}>
+          <div style={{ position: "absolute", top: -12, right: 16, background: "var(--accent)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 10, textTransform: "uppercase" }}>Most Popular</div>
+          <h3 style={{ fontSize: 20, marginBottom: 6 }}>Pro Growth</h3>
+          <div style={{ fontSize: 26, fontWeight: 700, margin: "10px 0", color: "var(--accent-ink)" }}>$29 <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>/ mo</span></div>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>For growing agencies, consultants, and sales reps.</p>
+          <ul style={{ paddingLeft: 18, fontSize: 13, color: "var(--ink-2)", display: "flex", flexDirection: "column", gap: 8, flex: 1, margin: "0 0 20px" }}>
+            <li>10 Team Users</li>
+            <li>5,000 Contacts</li>
+            <li>Full Native AI Assistant Suite</li>
+            <li>Automated Cold Call Queue</li>
+            <li>Advanced Executive Analytics</li>
+            <li>Multi-Tenant RLS Security</li>
+          </ul>
+          <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={() => toast("Pro Growth subscription active!")}>
+            {currentPlan === "pro" ? "Active Subscription" : "Upgrade to Pro"}
+          </button>
+        </div>
+
+        {/* Business Plan */}
+        <div className="card card-pad" style={{ display: "flex", flexDirection: "column" }}>
+          <h3 style={{ fontSize: 20, marginBottom: 6 }}>Business Enterprise</h3>
+          <div style={{ fontSize: 26, fontWeight: 700, margin: "10px 0" }}>$79 <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>/ mo</span></div>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>For large teams requiring custom pipelines & white-labeling.</p>
+          <ul style={{ paddingLeft: 18, fontSize: 13, color: "var(--ink-2)", display: "flex", flexDirection: "column", gap: 8, flex: 1, margin: "0 0 20px" }}>
+            <li>Unlimited Team Users</li>
+            <li>Unlimited Contacts & Lists</li>
+            <li>Custom White-Label Branding</li>
+            <li>Custom Pipeline Stages</li>
+            <li>Priority AI API Rate Limits</li>
+            <li>Dedicated Developer Support</li>
+          </ul>
+          <button className="btn" style={{ width: "100%", justifyContent: "center" }} onClick={() => toast("Contact licensing@orbitcrm.io for Business Enterprise plan")}>
+            Upgrade to Business
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PortfolioModal({ onClose }) {
+  return (
+    <Modal onClose={onClose}>
+      <div className="modal-head">
+        <h3>🚀 Orbit CRM — Architecture Showcase</h3>
+        <button className="icon-btn" onClick={onClose}><X size={17} /></button>
+      </div>
+      <div className="sheet-body" style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)" }}>
+        <p><b>Product Positioning:</b> AI-Powered Multi-Tenant Sales & Outreach CRM SaaS.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "14px 0" }}>
+          <div style={{ padding: 10, background: "var(--bg)", borderRadius: 8, border: "1px solid var(--line)" }}>
+            <b>Frontend:</b> React 18, Vite, Lucide Icons, Recharts, Responsive CSS tokens.
+          </div>
+          <div style={{ padding: 10, background: "var(--bg)", borderRadius: 8, border: "1px solid var(--line)" }}>
+            <b>Backend & Security:</b> Supabase PostgreSQL, Row Level Security (RLS) policies, JWT Auth.
+          </div>
+          <div style={{ padding: 10, background: "var(--bg)", borderRadius: 8, border: "1px solid var(--line)" }}>
+            <b>Multi-Tenancy:</b> Tenant-isolated `workspace_id`, Role-Based Access Control (RBAC).
+          </div>
+          <div style={{ padding: 10, background: "var(--bg)", borderRadius: 8, border: "1px solid var(--line)" }}>
+            <b>AI Suite:</b> Native AI Lead Summaries, Score Explanations, Follow-up Generator, Deal Risk Alerts.
+          </div>
+        </div>
+        <p>Built as a high-velocity, commercially viable SaaS foundation for founders, agencies, and international clients.</p>
+      </div>
+      <div className="modal-foot">
+        <button className="btn btn-primary" onClick={onClose}>Close Showcase</button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function App() {
   const [db, setDb] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -2167,6 +2479,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dashFilters, setDashFilters] = useState({ business: "all", industry: "all", source: "all", range: "all" });
+  const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [refresh, setRefresh] = useState(0);
   const searchRef = useRef();
@@ -2620,8 +2933,13 @@ export default function App() {
                   </div>
                 )}
               </div>
+              <button className="btn" onClick={() => setShowPortfolioModal(true)} style={{ gap: 6, fontSize: 13 }}>
+                <Zap size={14} style={{ color: "var(--accent)" }} /> Showcase
+              </button>
               <button className="btn btn-primary" onClick={() => setLeadForm({})}><Plus size={15} />New lead</button>
             </div>
+
+            {showPortfolioModal && <PortfolioModal onClose={() => setShowPortfolioModal(false)} />}
 
             <div className="content">
               {nav === "dashboard" && <Dashboard db={db} lk={lk} filters={dashFilters} setFilters={setDashFilters} onOpen={setOpenLeadId} onToggleTask={toggleTask} />}
@@ -2630,6 +2948,8 @@ export default function App() {
               {nav === "tasks" && <TasksView db={db} lk={lk} onOpen={setOpenLeadId} onToggle={toggleTask} onAdd={() => setTaskForm({})} onEdit={(t) => setTaskForm({ initial: t })} onDelete={deleteTask} />}
               {nav === "calendar" && <CalendarView db={db} onOpen={setOpenLeadId} />}
               {nav === "reports" && <ReportsView db={db} lk={lk} />}
+              {nav === "ai_assistant" && <AIAssistantView cx={cx} db={db} lk={lk} toast={toast} />}
+              {nav === "pricing" && <SaaSPlansView currentPlan="pro" toast={toast} />}
               {nav === "settings" && <SettingsView db={db} handlers={handlers} onExportCSV={exportCSV} onImportCSV={importCSV} onBackup={backup} onRestore={restore} onReset={reset} toast={toast} />}
 
               {["cold", "contact_lists", "all_contacts", "call_queue", "cold_dashboard", "import_history"].includes(nav) && (

@@ -29,14 +29,21 @@ export default function LoginScreen({ onGoToHome, onLoggedIn, onStartDemo }) {
         if (error.message === "Invalid login credentials" || error.message.includes("Invalid")) {
           setError(
             <div>
-              Invalid login credentials for <b>{cleanEmail}</b>.
+              <div>Invalid login credentials for <b>{cleanEmail}</b>.</div>
               {suggestedEmail && (
                 <div style={{ marginTop: '6px' }}>
-                  Did you mean <button type="button" onClick={() => setEmail(suggestedEmail)} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>{suggestedEmail}</button>?
+                  Did you mean <button type="button" onClick={() => { setEmail(suggestedEmail); setError(null); }} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>{suggestedEmail}</button>?
                 </div>
               )}
-              <div style={{ marginTop: '8px' }}>
-                Don't have an account registered yet? <button type="button" onClick={() => setMode('signup')} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>Click here to Create Account</button>.
+              <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span>Don't have an account yet?</span>
+                <button type="button" onClick={() => { setMode('signup'); setError(null); }} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>Click to Create Account</button>
+                {onStartDemo && (
+                  <>
+                    <span>or</span>
+                    <button type="button" onClick={onStartDemo} style={{ color: '#46C285', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>🚀 Open Live Demo</button>
+                  </>
+                )}
               </div>
             </div>
           );

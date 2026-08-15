@@ -753,6 +753,9 @@ function LeadCard({ lead, lk, coldDays, onOpen, onDragStart, onDragEnd, dragging
       <div className="lc-meta">
         {biz && bizChip(biz)}
         {ind && <Badge>{ind.name}</Badge>}
+        <Badge style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent-ink)", fontWeight: 600 }}>
+          ✨ {aiEngine.calculateLeadScore({ contactName: lead.contactName, company: lead.company, priority: lead.priority, conversations: (lead.interactions||[]).length }).score} AI
+        </Badge>
       </div>
       <div className="lc-foot">
         <span className="lc-val">{money(lead.dealValue)}</span>
@@ -1241,6 +1244,7 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
 
   const tabs = [
     { key: "overview", label: "Overview" },
+    { key: "ai", label: "✨ AI Insights" },
     { key: "qual", label: "Qualification" },
     { key: "deal", label: "Deal" },
     { key: "activity", label: "Activity", count: allInteractions.length },
@@ -1298,6 +1302,29 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
       <div className="sheet-body">
         {tab === "overview" && (
           <div>
+            <div style={{
+              background: "linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent) 0%, color-mix(in srgb, var(--accent) 5%, transparent) 100%)",
+              border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+              borderRadius: 12,
+              padding: "14px 16px",
+              marginBottom: 18
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13, color: "var(--accent-ink)" }}>
+                  <Zap size={15} /> AI Executive Lead Summary
+                </div>
+                <div style={{
+                  background: "var(--accent)", color: "#fff",
+                  padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700
+                }}>
+                  Score: {aiEngine.calculateLeadScore({ contactName: lead.contactName, company: lead.company, priority: lead.priority }).score}/100
+                </div>
+              </div>
+              <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--ink)" }}>
+                {aiEngine.generateLeadSummary({ contactName: lead.contactName, company: lead.company, attempts: 2, conversations: (allInteractions||[]).length, lastOutcome: lead.stage }, allInteractions || [])}
+              </div>
+            </div>
+
             <SubHead>Contact</SubHead>
             <KV k="Email">{lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : null}</KV>
             <KV k="Phone">{lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : null}</KV>
@@ -1326,6 +1353,53 @@ function LeadDetail({ lead, db, lk, onClose, onEdit, onUpdate, onDelete, onLog, 
             </KV>
             {lead.closeResult === "lost" && <KV k="Loss reason"><Badge color="var(--bad)">{lead.closeReason}</Badge></KV>}
             {lead.closeResult === "won" && <><KV k="Won service">{lead.wonService}</KV><KV k="Payment">{lead.wonPayment}</KV><KV k="Closed">{fmtDate(lead.wonDate)}</KV></>}
+          </div>
+        )}
+
+        {tab === "ai" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="card card-pad">
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: "50%",
+                  background: "color-mix(in srgb, var(--accent) 15%, transparent)",
+                  color: "var(--accent-ink)", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 16
+                }}>
+                  {aiEngine.calculateLeadScore({ contactName: lead.contactName, company: lead.company, priority: lead.priority }).score}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>AI Intent Score ({aiEngine.calculateLeadScore({ contactName: lead.contactName, company: lead.company, priority: lead.priority }).score}/100)</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>{aiEngine.calculateLeadScore({ contactName: lead.contactName, company: lead.company, priority: lead.priority }).breakdown.join(" · ")}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, background: "var(--bg)", padding: 12, borderRadius: 8, border: "1px solid var(--line)", lineHeight: 1.5 }}>
+                {aiEngine.generateLeadSummary({ contactName: lead.contactName, company: lead.company, attempts: 2, conversations: (allInteractions||[]).length, lastOutcome: lead.stage }, allInteractions || [])}
+              </div>
+            </div>
+
+            <div className="card card-pad">
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "var(--ink)" }}>AI Deal Risk Assessment</div>
+              <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+                {aiEngine.analyzeDealRisk(lead, lead.stage, 10, allInteractions).text}
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--accent-ink)", fontWeight: 600, marginTop: 8 }}>
+                Next Action: {aiEngine.analyzeDealRisk(lead, lead.stage, 10, allInteractions).action}
+              </div>
+            </div>
+
+            <div className="card card-pad">
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8 }}>AI Follow-up Email Draft</div>
+              <textarea
+                readOnly
+                value={aiEngine.generateFollowUpMessage({ firstName: lead.contactName, company: lead.company }, null, "professional")}
+                style={{ width: "100%", height: 110, background: "var(--panel-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: 10, fontSize: 12.5, resize: "none" }}
+              />
+              <div style={{ marginTop: 8, textAlign: "right" }}>
+                <button className="btn btn-sm" onClick={() => safeCopyToClipboard(aiEngine.generateFollowUpMessage({ firstName: lead.contactName, company: lead.company }, null, "professional"), () => toast("Draft copied!"))}>
+                  <Copy size={13} /> Copy Draft
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

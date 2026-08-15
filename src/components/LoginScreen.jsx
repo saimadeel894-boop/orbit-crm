@@ -161,6 +161,32 @@ export default function LoginScreen({ onGoToHome, onLoggedIn, onStartDemo }) {
           </p>
         </div>
 
+        {onStartDemo && (
+          <button
+            type="button"
+            onClick={onStartDemo}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(90deg, #4F6BFF 0%, #3B52D4 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '12px',
+              fontWeight: '700',
+              fontSize: '14px',
+              cursor: 'pointer',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(79,107,255,0.35)'
+            }}
+          >
+            🚀 Launch Workspace (Instant Live Demo)
+          </button>
+        )}
+
         {/* Mode switcher tabs */}
         <div style={{
           display: 'flex',

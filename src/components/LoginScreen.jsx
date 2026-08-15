@@ -11,23 +11,43 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
 
+  const suggestedEmail = email && email.includes('@') && email.endsWith('.co')
+    ? email.replace(/\.co$/i, '.com')
+    : null;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
 
+    const cleanEmail = email.trim();
+
     if (mode === 'signin') {
-      const { error } = await signIn(email, password);
+      const { error } = await signIn(cleanEmail, password);
       if (error) {
-        setError(error.message === "Invalid login credentials" 
-          ? "Invalid login credentials. Don't have an account yet? Click 'Create Account' below to sign up."
-          : error.message);
+        if (error.message === "Invalid login credentials" || error.message.includes("Invalid")) {
+          setError(
+            <div>
+              Invalid login credentials for <b>{cleanEmail}</b>.
+              {suggestedEmail && (
+                <div style={{ marginTop: '6px' }}>
+                  Did you mean <button type="button" onClick={() => setEmail(suggestedEmail)} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>{suggestedEmail}</button>?
+                </div>
+              )}
+              <div style={{ marginTop: '8px' }}>
+                Don't have an account registered yet? <button type="button" onClick={() => setMode('signup')} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>Click here to Create Account</button>.
+              </div>
+            </div>
+          );
+        } else {
+          setError(error.message);
+        }
       } else if (onLoggedIn) {
         onLoggedIn();
       }
     } else {
-      const { data, error } = await signUp(email, password);
+      const { data, error } = await signUp(cleanEmail, password);
       if (error) {
         setError(error.message);
       } else if (data?.user) {
@@ -35,7 +55,7 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
           setSuccessMessage("Account created successfully! Redirecting...");
           if (onLoggedIn) setTimeout(onLoggedIn, 1000);
         } else {
-          setSuccessMessage("Account created! Check your email to confirm your account, then sign in.");
+          setSuccessMessage("Account created for " + cleanEmail + "! You can now sign in.");
           setMode('signin');
         }
       }

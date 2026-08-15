@@ -24,31 +24,44 @@ export default function LoginScreen({ onGoToHome, onLoggedIn, onStartDemo }) {
     const cleanEmail = email.trim();
 
     if (mode === 'signin') {
-      const { error } = await signIn(cleanEmail, password);
-      if (error) {
-        if (error.message === "Invalid login credentials" || error.message.includes("Invalid")) {
-          setError(
-            <div>
-              <div>Invalid login credentials for <b>{cleanEmail}</b>.</div>
-              {suggestedEmail && (
-                <div style={{ marginTop: '6px' }}>
-                  Did you mean <button type="button" onClick={() => { setEmail(suggestedEmail); setError(null); }} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>{suggestedEmail}</button>?
-                </div>
-              )}
-              <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <span>Don't have an account yet?</span>
-                <button type="button" onClick={() => { setMode('signup'); setError(null); }} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>Click to Create Account</button>
-                {onStartDemo && (
-                  <>
-                    <span>or</span>
-                    <button type="button" onClick={onStartDemo} style={{ color: '#46C285', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>🚀 Open Live Demo</button>
-                  </>
+      const { error: signInErr } = await signIn(cleanEmail, password);
+      if (signInErr) {
+        // Fallback: If account does not exist yet, attempt automatic creation
+        if (signInErr.message === "Invalid login credentials" || signInErr.message.includes("Invalid")) {
+          const { data: signUpData, error: signUpErr } = await signUp(cleanEmail, password);
+          if (signUpData?.user) {
+            if (signUpData.session) {
+              setSuccessMessage("Account created & signed in successfully!");
+              if (onLoggedIn) setTimeout(onLoggedIn, 500);
+            } else {
+              // Attempt sign in one more time in case user was already registered
+              const { error: reSignInErr } = await signIn(cleanEmail, password);
+              if (!reSignInErr && onLoggedIn) {
+                onLoggedIn();
+              } else {
+                setSuccessMessage("Account created for " + cleanEmail + "! Check your email inbox to confirm, or click '🚀 Try Live Demo' below.");
+              }
+            }
+          } else if (signUpErr) {
+            setError(
+              <div>
+                <div>Invalid credentials or password for <b>{cleanEmail}</b>.</div>
+                {suggestedEmail && (
+                  <div style={{ marginTop: '6px' }}>
+                    Did you mean <button type="button" onClick={() => { setEmail(suggestedEmail); setError(null); }} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>{suggestedEmail}</button>?
+                  </div>
                 )}
+                <div style={{ marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button type="button" onClick={() => { setMode('signup'); setError(null); }} style={{ color: '#7B93FF', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>Create Account</button>
+                  {onStartDemo && (
+                    <button type="button" onClick={onStartDemo} style={{ color: '#46C285', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>🚀 Open Live Demo</button>
+                  )}
+                </div>
               </div>
-            </div>
-          );
+            );
+          }
         } else {
-          setError(error.message);
+          setError(signInErr.message);
         }
       } else if (onLoggedIn) {
         onLoggedIn();
@@ -60,7 +73,7 @@ export default function LoginScreen({ onGoToHome, onLoggedIn, onStartDemo }) {
       } else if (data?.user) {
         if (data.session) {
           setSuccessMessage("Account created successfully! Redirecting...");
-          if (onLoggedIn) setTimeout(onLoggedIn, 1000);
+          if (onLoggedIn) setTimeout(onLoggedIn, 500);
         } else {
           setSuccessMessage("Account created for " + cleanEmail + "! You can now sign in.");
           setMode('signin');

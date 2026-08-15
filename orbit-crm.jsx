@@ -22,6 +22,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "./src/lib/supabase";
 import { getSession, onAuthChange, signOut } from "./src/lib/auth";
 import LoginScreen from "./src/components/LoginScreen";
+import LandingPage from "./src/components/LandingPage";
 import { mapLeadToSupabase, mapTaskToSupabase, mapTaskToLocal, mapLeadToLocal, mapContactToLocal, mapActivityToLocal, mapActivityToSupabase, mapLeadListToLocal } from "./src/lib/mappers";
 import * as dbApi from "./src/lib/db";
 
@@ -304,6 +305,8 @@ const CSS = `
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
   --shadow-lg: 0 16px 48px rgba(0,0,0,.5);
 }
+@keyframes shimmer { 0% { opacity: .4; } 50% { opacity: .8; } 100% { opacity: .4; } }
+.skeleton { background: var(--line); border-radius: 8px; animation: shimmer 1.4s infinite ease-in-out; }
 .orbit h1,.orbit h2,.orbit h3,.orbit h4 { font-family:'Space Grotesk',sans-serif; margin:0; font-weight:600; letter-spacing:-.01em; }
 .orbit .num { font-family:'Space Grotesk',sans-serif; font-variant-numeric: tabular-nums; }
 .orbit button { font-family: inherit; cursor: pointer; }
@@ -1863,6 +1866,8 @@ function SettingsView({ db, handlers, onExportCSV, onImportCSV, onBackup, onRest
   const fileRef = useRef(); const csvRef = useRef();
   return (
     <div style={{ maxWidth: 760 }}>
+      <EditableList title="Businesses & Ventures" items={db.businesses || []}
+        onAdd={n => handlers.addBusiness(n)} onRemove={id => handlers.removeBusiness(id)} />
       <EditableList title="Industries" items={db.industries} archivable
         onAdd={n => handlers.addIndustry(n)} onRename={(id, patch) => handlers.updateIndustry(id, patch)} onRemove={id => handlers.removeIndustry(id)} onToggleArchive={id => handlers.toggleIndustry(id)} />
       <EditableList title="Lead sources" items={db.sources}
@@ -1902,6 +1907,25 @@ function SettingsView({ db, handlers, onExportCSV, onImportCSV, onBackup, onRest
         </div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 12 }}>
           Your data is saved automatically in this workspace and persists across sessions. Export a backup regularly to keep an off-app copy.
+        </div>
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 14 }}>
+        <div className="section-head"><h3>About Orbit CRM</h3></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--accent)", color: "#fff", display: "grid", placeItems: "center" }}>
+            <CircleDot size={22} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>Orbit CRM v1.0.0</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Commercial SaaS & Portfolio Edition</div>
+          </div>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 14px", lineHeight: 1.5 }}>
+          Built for high-velocity cold calling, lead list management, and pipeline execution. Fully integrated with Supabase RLS and automated queueing.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a className="btn btn-primary" href="mailto:licensing@orbitcrm.io?subject=Orbit%20CRM%20Licensing"><Mail size={15} />Contact Developer / Licensing</a>
         </div>
       </div>
     </div>
@@ -2155,6 +2179,36 @@ export default function App() {
 
   /* ---- load / persist ---- */
   const [session, setSession] = useState(null);
+  const [currentRoute, setCurrentRoute] = useState(() => {
+    const p = window.location.pathname;
+    const h = window.location.hash;
+    if (p === '/login' || h === '#login') return 'login';
+    if (p === '/app' || h === '#app') return 'app';
+    return 'landing';
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      const h = window.location.hash;
+      if (p === '/login' || h === '#login') setCurrentRoute('login');
+      else if (p === '/app' || h === '#app') setCurrentRoute('app');
+      else if (p === '/' && !h) setCurrentRoute('landing');
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
+
+  const navigateTo = (route) => {
+    setCurrentRoute(route);
+    if (route === 'landing') window.location.hash = '';
+    else if (route === 'login') window.location.hash = 'login';
+    else if (route === 'app') window.location.hash = 'app';
+  };
 
   useEffect(() => {
     getSession().then(({ data: { session } }) => {
@@ -2388,6 +2442,8 @@ export default function App() {
 
   /* ---- settings handlers ---- */
   const handlers = {
+    addBusiness: (name, color = "#4F6BFF") => update(s => { s.businesses.push({ id: uid("b"), name, color }); }),
+    removeBusiness: id => update(s => { s.businesses = s.businesses.filter(b => b.id !== id); }),
     addIndustry: n => update(s => { s.industries.push({ id: uid("ind"), name: n, archived: false }); }),
     updateIndustry: (id, patch) => update(s => { const i = s.industries.find(x => x.id === id); if (i) Object.assign(i, patch); }),
     removeIndustry: id => update(s => { s.industries = s.industries.filter(i => i.id !== id); }),
@@ -2467,7 +2523,24 @@ export default function App() {
   };
   const openContact = openContactData;
   const contactsReady = cx.cloaded && cx.cdb;
-  const pageTitle = NAV.find(n => n.key === nav)?.label;
+  const handleLogout = async () => {
+    await signOut();
+    setSession(null);
+    navigateTo('landing');
+  };
+
+  const theme = db?.settings?.theme || localStorage.getItem("orbit_theme") || "light";
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  if (currentRoute === 'landing') {
+    return <LandingPage onGoToLogin={() => navigateTo('login')} onGoToApp={() => navigateTo('app')} isAuthenticated={!!session} />;
+  }
+
+  if (currentRoute === 'login' || (!session && currentRoute === 'app')) {
+    return <LoginScreen onGoToHome={() => navigateTo('landing')} onLoggedIn={() => navigateTo('app')} />;
+  }
 
   if (!loaded || !db) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f0f0f', color: '#fff' }}>Loading workspace...</div>;
 
@@ -3111,12 +3184,10 @@ function ContactListsView({ cx, lk, onOpenList, onStartQueue, onImport, onExport
   useEffect(() => {
     let active = true;
     const fetchLists = async () => {
-      console.log("ContactListsView: fetching lead_lists from Supabase...");
       setLoading(true);
       setErrorState(null);
       try {
         const { data, error } = await dbApi.getLeadLists();
-        console.log("ContactListsView raw Supabase response:", data, error);
         if (!active) return;
         if (error) throw error;
         const mapped = (data || []).map(mapLeadListToLocal);
@@ -3435,11 +3506,7 @@ function ImportWizard({ cx, lk, preList, onClose, onSuccess }) {
     else cx.updateList(listId, { status: "Active", lastActivity: nowISO() });
     const { news, updates, rejected } = preparedRef.current;
     const newContacts = news.map(f => makeContact({ ...f, businessId: ctx.businessId, listId: listId, listIds: [listId], importId: impId }));
-    // Insert via Supabase batch API
-    console.log("Contacts to import, listId:", listId, newContacts.length, newContacts[0]);
-    console.log("listId before import:", listId, "first contact listId:", newContacts[0]?.listIds);
     const result = await dbApi.batchImportContacts(newContacts);
-    console.log("Import result:", result);
     if (result.data) {
       cx.addContacts(result.data.map(mapContactToLocal));
     }

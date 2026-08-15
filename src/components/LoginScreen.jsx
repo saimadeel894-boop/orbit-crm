@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { signIn } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { LogIn } from 'lucide-react';
+import { ArrowLeft, CircleDot } from 'lucide-react';
 
-export default function LoginScreen() {
+export default function LoginScreen({ onGoToHome, onLoggedIn }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -17,6 +17,8 @@ export default function LoginScreen() {
     const { error } = await signIn(email, password);
     if (error) {
       setError(error.message);
+    } else if (onLoggedIn) {
+      onLoggedIn();
     }
     setLoading(false);
   };
@@ -56,12 +58,32 @@ export default function LoginScreen() {
         maxWidth: '420px',
         boxShadow: '0 16px 48px rgba(0,0,0,0.5)'
       }}>
+        {onGoToHome && (
+          <button
+            type="button"
+            onClick={onGoToHome}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#8B94A3',
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '20px',
+              padding: 0
+            }}
+          >
+            <ArrowLeft size={15} /> Back to Landing Page
+          </button>
+        )}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{
-            width: '42px',
-            height: '42px',
+            width: '44px',
+            height: '44px',
             borderRadius: '12px',
-            background: '#4F6BFF',
+            background: 'linear-gradient(135deg, #4F6BFF 0%, #3B52D4 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -69,7 +91,7 @@ export default function LoginScreen() {
             margin: '0 auto 16px',
             boxShadow: '0 4px 14px rgba(79,107,255,0.4)'
           }}>
-            <LogIn size={20} />
+            <CircleDot size={22} />
           </div>
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '24px', margin: '0 0 6px 0', fontWeight: '600' }}>
             Orbit CRM

@@ -1,7 +1,7 @@
 export const mapLeadListToLocal = (l) => ({
   id: String(l.id),
   name: l.name || '',
-  businessId: l.business_id || l.businessId || 'b_23labs',
+  businessId: l.business_id || l.businessId || 'b_default',
   industry: l.industry || '',
   subIndustry: l.sub_industry || l.subIndustry || '',
   source: l.source || '',

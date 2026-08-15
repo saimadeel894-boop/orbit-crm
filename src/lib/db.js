@@ -25,7 +25,6 @@ const isUuid = (id) => typeof id === 'string' && id.length === 36 && id.includes
 const ALLOWED_FIELDS = ['business_id', 'name', 'email', 'phone', 'company', 'location', 'industry_id', 'source_id', 'priority', 'authority', 'call_status', 'attempts', 'conversations', 'last_call_date', 'last_outcome', 'next_call_date', 'notes', 'tags', 'lead_list_id', 'updated_at'];
 
 export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50, search = '', callStatus = '', orderBy = 'created_at' }) => {
-  console.log("getContacts called with:", { businessId, page, pageSize, search });
   const uid = await getUid();
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -47,11 +46,9 @@ export const getContacts = async ({ businessId, listId, page = 1, pageSize = 50,
 
   query = query.order(orderBy, { ascending: false }).range(from, to);
 
-  console.log("Before getContacts query", { businessId, listId });
   const timeout = setTimeout(() => console.error("getContacts timed out after 10s"), 10000);
   const res = await query;
   clearTimeout(timeout);
-  console.log("getContacts result:", res.data?.length, "rows, error:", res.error);
 
   return handleResponse(res);
 };
@@ -78,7 +75,6 @@ export const updateContact = async (id, patch) => {
     }
   });
   if (cleanPatch.email === '') cleanPatch.email = null;
-  console.log("Final patch:", JSON.stringify(cleanPatch));
   return handleResponse(await supabase.from('contacts').update(cleanPatch).eq('id', id).eq('user_id', uid).select().maybeSingle());
 };
 
@@ -97,7 +93,6 @@ export const bulkUpdateContacts = async (ids, patch) => {
     }
   });
   if (cleanPatch.email === '') cleanPatch.email = null;
-  console.log("Final patch:", JSON.stringify(cleanPatch));
   return handleResponse(await supabase.from('contacts').update(cleanPatch).in('id', ids).eq('user_id', uid));
 };
 
@@ -114,10 +109,8 @@ export const batchImportContacts = async (rows) => {
 
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize).map(r => mapContactToSupabase(r, uid));
-    const { data, error } = await supabase.from('contacts').insert(chunk).select(); // Supabase ignores duplicates if unique constraints are set, or we can use upsert
-    console.log("Supabase insert response:", data, error);
+    const { data, error } = await supabase.from('contacts').insert(chunk).select();
     if (error) {
-      console.error("Supabase insert error:", JSON.stringify(error));
       allError = error;
       break;
     }
@@ -325,7 +318,6 @@ export const exportContacts = async (businessId) => {
 export const getLeadLists = async () => {
   const uid = await getUid();
   const res = await supabase.from('lead_lists').select('*').eq('user_id', uid);
-  console.log('getLeadLists raw Supabase response:', res.data, res.error);
   return handleResponse(res);
 };
 

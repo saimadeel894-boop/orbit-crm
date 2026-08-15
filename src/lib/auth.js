@@ -5,10 +5,7 @@ export const signIn = async (email, password) => {
 };
 
 export const signOut = async () => {
-  console.log("Triggering Supabase signOut");
-  const result = await supabase.auth.signOut();
-  console.log("SignOut resolved", result);
-  return result;
+  return await supabase.auth.signOut();
 };
 
 export const getSession = async () => {

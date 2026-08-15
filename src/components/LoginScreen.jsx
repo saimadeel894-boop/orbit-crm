@@ -3,7 +3,7 @@ import { signIn, signUp } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, CircleDot } from 'lucide-react';
 
-export default function LoginScreen({ onGoToHome, onLoggedIn }) {
+export default function LoginScreen({ onGoToHome, onLoggedIn, onStartDemo }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -303,6 +303,30 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
             {loading ? (mode === 'signin' ? 'Signing in...' : 'Creating account...') : (mode === 'signin' ? 'Sign In' : 'Create Account')}
           </button>
         </form>
+
+        {onStartDemo && (
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #262C36', textAlign: 'center' }}>
+            <p style={{ color: '#8B94A3', fontSize: '13px', margin: '0 0 10px' }}>Want to explore without logging in?</p>
+            <button
+              type="button"
+              onClick={onStartDemo}
+              style={{
+                width: '100%',
+                background: 'color-mix(in srgb, #4F6BFF 15%, transparent)',
+                color: '#4F6BFF',
+                border: '1px solid #4F6BFF',
+                padding: '10px',
+                borderRadius: '10px',
+                fontWeight: '600',
+                fontSize: '13.5px',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              🚀 Try Live Demo (Sample Data)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

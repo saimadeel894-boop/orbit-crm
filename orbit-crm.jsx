@@ -283,6 +283,64 @@ function buildInitialState() {
   };
 }
 
+function buildInitialStateWithDemo() {
+  const demoLeads = demoData.DEMO_LEADS.map(l => ({
+    id: l.id,
+    businessId: "b_default",
+    contactName: l.title.split(" — ")[0],
+    company: l.title.split(" — ")[0],
+    email: "contact@" + (l.title.split(" — ")[0].toLowerCase().replace(/\s/g, "")) + ".com",
+    phone: "+1 (555) 019-2831",
+    industryId: "ind_tech",
+    sourceId: "src_inbound",
+    stage: l.stage,
+    dealValue: l.dealValue,
+    oneOff: l.oneOff,
+    mrr: l.mrr,
+    archived: false,
+    fav: true,
+    createdAt: l.createdAt,
+    updatedAt: new Date().toISOString(),
+    interactions: [
+      { id: "act_1", type: "call", date: new Date().toISOString(), outcome: "Demo Booked", notes: "Showcased AI Assistant capabilities.", person: "Demo User" }
+    ],
+    notes: l.aiRisk
+  }));
+
+  return {
+    businesses: [{ id: "b_default", name: "Apex Growth SaaS", color: "#4F6BFF" }],
+    industries: [
+      { id: "ind_tech", name: "Technology & SaaS" },
+      { id: "ind_logistics", name: "Freight & Logistics" },
+      { id: "ind_health", name: "Healthcare" }
+    ],
+    sources: [
+      { id: "src_inbound", name: "Inbound Web" },
+      { id: "src_outreach", name: "Cold Calling" }
+    ],
+    lossReasons: DEFAULT_LOSS_REASONS,
+    leads: demoLeads,
+    tasks: demoData.DEMO_TASKS.map(t => ({
+      id: t.id,
+      title: t.title,
+      leadId: t.leadId,
+      businessId: "b_default",
+      dueDate: t.dueDate,
+      dueTime: t.dueTime,
+      priority: t.priority,
+      status: t.status,
+      notes: t.notes
+    })),
+    folders: [],
+    lists: [{ id: "list_demo", name: "High-Intent Leads 2026", count: 4, businessId: "b_default", createdAt: new Date().toISOString() }],
+    imports: [],
+    settings: { coldDays: 7, theme: localStorage.getItem("orbit_theme") || "dark" },
+    dnc: { phones: {}, emails: {} },
+    contactFilters: [],
+    mappingTemplates: [],
+  };
+}
+
 /* ---------- styles ---------- */
 
 const CSS = `
@@ -2513,6 +2571,7 @@ export default function App() {
 
   /* ---- load / persist ---- */
   const [session, setSession] = useState(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [currentRoute, setCurrentRoute] = useState(() => {
     const p = window.location.pathname;
     const h = window.location.hash;
@@ -2520,6 +2579,28 @@ export default function App() {
     if (p === '/app' || h === '#app') return 'app';
     return 'landing';
   });
+
+  const startDemoMode = () => {
+    setIsDemoMode(true);
+    setDb(buildInitialStateWithDemo());
+    setLoaded(true);
+    setCurrentRoute('app');
+    window.location.hash = 'app';
+    toast("Loaded Interactive Portfolio Demo Workspace (Sample Data)");
+  };
+
+  const resetDemoData = () => {
+    setDb(buildInitialStateWithDemo());
+    toast("Demo Workspace data reset!");
+  };
+
+  const exitDemoMode = () => {
+    setIsDemoMode(false);
+    if (!session) {
+      setCurrentRoute('landing');
+      window.location.hash = '';
+    }
+  };
 
   useEffect(() => {
     const handlePopState = () => {
@@ -2868,12 +2949,12 @@ export default function App() {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
-  if (currentRoute === 'landing') {
-    return <LandingPage onGoToLogin={() => navigateTo('login')} onGoToApp={() => navigateTo('app')} isAuthenticated={!!session} />;
+  if (currentRoute === 'landing' && !isDemoMode) {
+    return <LandingPage onGoToLogin={() => navigateTo('login')} onGoToApp={() => navigateTo('app')} onStartDemo={startDemoMode} isAuthenticated={!!session} />;
   }
 
-  if (currentRoute === 'login' || (!session && currentRoute === 'app')) {
-    return <LoginScreen onGoToHome={() => navigateTo('landing')} onLoggedIn={() => navigateTo('app')} />;
+  if ((currentRoute === 'login' || (!session && currentRoute === 'app')) && !isDemoMode) {
+    return <LoginScreen onGoToHome={() => navigateTo('landing')} onLoggedIn={() => navigateTo('app')} onStartDemo={startDemoMode} />;
   }
 
   if (!loaded || !db) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f0f0f', color: '#fff' }}>Loading workspace...</div>;
@@ -2883,6 +2964,25 @@ export default function App() {
       <style>{CSS}</style>
       <style>{CONTACTS_CSS}</style>
       <div className="orbit" data-theme={theme}>
+        {isDemoMode && (
+          <div style={{
+            background: "linear-gradient(90deg, #4F6BFF 0%, #3B52D4 100%)",
+            color: "#fff",
+            padding: "8px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: "13px",
+            fontWeight: "600",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
+          }}>
+            <div>🚀 Interactive Portfolio Demo Workspace (Sample Data Only)</div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={resetDemoData} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Reset Demo Data</button>
+              <button onClick={exitDemoMode} style={{ background: "rgba(0,0,0,0.3)", border: "none", color: "#fff", padding: "4px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Exit Demo</button>
+            </div>
+          </div>
+        )}
         <div className="app-shell">
           {/* sidebar */}
           <aside className={clsx("sidebar", sidebarOpen && "open")}>

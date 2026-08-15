@@ -1,7 +1,7 @@
 import React from 'react';
 import { CircleDot, PhoneCall, Users, Kanban, ArrowRight, ShieldCheck, Zap, CheckCircle2, Lock } from 'lucide-react';
 
-export default function LandingPage({ onGoToLogin, onGoToApp, isAuthenticated }) {
+export default function LandingPage({ onGoToLogin, onGoToApp, onStartDemo, isAuthenticated }) {
   return (
     <div style={{
       minHeight: '100vh',
@@ -39,7 +39,27 @@ export default function LandingPage({ onGoToLogin, onGoToApp, isAuthenticated })
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {onStartDemo && (
+            <button
+              onClick={onStartDemo}
+              style={{
+                background: 'color-mix(in srgb, #4F6BFF 15%, transparent)',
+                color: '#4F6BFF',
+                border: '1px solid #4F6BFF',
+                padding: '10px 18px',
+                borderRadius: '10px',
+                fontWeight: '600',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              🚀 Try Live Demo
+            </button>
+          )}
           {isAuthenticated ? (
             <button
               onClick={onGoToApp}
@@ -154,7 +174,7 @@ export default function LandingPage({ onGoToLogin, onGoToApp, isAuthenticated })
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <button
-            onClick={isAuthenticated ? onGoToApp : onGoToLogin}
+            onClick={onStartDemo || (isAuthenticated ? onGoToApp : onGoToLogin)}
             style={{
               background: '#4F6BFF',
               color: '#fff',
@@ -170,7 +190,22 @@ export default function LandingPage({ onGoToLogin, onGoToApp, isAuthenticated })
               boxShadow: '0 8px 24px rgba(79,107,255,0.4)'
             }}
           >
-            {isAuthenticated ? 'Launch CRM Workspace' : 'Get Started Free'} <ArrowRight size={18} />
+            🚀 Try Live Demo <ArrowRight size={18} />
+          </button>
+          <button
+            onClick={isAuthenticated ? onGoToApp : onGoToLogin}
+            style={{
+              background: 'transparent',
+              color: '#E7EBF2',
+              border: '1px solid #262C36',
+              padding: '14px 28px',
+              borderRadius: '12px',
+              fontWeight: '600',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+          >
+            {isAuthenticated ? 'Launch Workspace' : 'Sign In'}
           </button>
         </div>
 

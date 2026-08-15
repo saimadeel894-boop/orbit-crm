@@ -1,24 +1,44 @@
 import React, { useState } from 'react';
-import { signIn } from '../lib/auth';
+import { signIn, signUp } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, CircleDot } from 'lucide-react';
 
 export default function LoginScreen({ onGoToHome, onLoggedIn }) {
+  const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [resetMessage, setResetMessage] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
-    const { error } = await signIn(email, password);
-    if (error) {
-      setError(error.message);
-    } else if (onLoggedIn) {
-      onLoggedIn();
+
+    if (mode === 'signin') {
+      const { error } = await signIn(email, password);
+      if (error) {
+        setError(error.message === "Invalid login credentials" 
+          ? "Invalid login credentials. Don't have an account yet? Click 'Create Account' below to sign up."
+          : error.message);
+      } else if (onLoggedIn) {
+        onLoggedIn();
+      }
+    } else {
+      const { data, error } = await signUp(email, password);
+      if (error) {
+        setError(error.message);
+      } else if (data?.user) {
+        if (data.session) {
+          setSuccessMessage("Account created successfully! Redirecting...");
+          if (onLoggedIn) setTimeout(onLoggedIn, 1000);
+        } else {
+          setSuccessMessage("Account created! Check your email to confirm your account, then sign in.");
+          setMode('signin');
+        }
+      }
     }
     setLoading(false);
   };
@@ -34,7 +54,7 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
     if (error) {
       setError(error.message);
     } else {
-      setResetMessage("Check your email for the password reset link.");
+      setSuccessMessage("Check your email for the password reset link.");
     }
     setLoading(false);
   };
@@ -96,7 +116,56 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '24px', margin: '0 0 6px 0', fontWeight: '600' }}>
             Orbit CRM
           </h1>
-          <p style={{ color: '#8B94A3', margin: 0, fontSize: '14px' }}>Sign in to your workspace</p>
+          <p style={{ color: '#8B94A3', margin: 0, fontSize: '14px' }}>
+            {mode === 'signin' ? 'Sign in to your workspace' : 'Create a new CRM account'}
+          </p>
+        </div>
+
+        {/* Mode switcher tabs */}
+        <div style={{
+          display: 'flex',
+          background: '#12161B',
+          borderRadius: '10px',
+          padding: '4px',
+          marginBottom: '20px',
+          border: '1px solid #262C36'
+        }}>
+          <button
+            type="button"
+            onClick={() => { setMode('signin'); setError(null); setSuccessMessage(null); }}
+            style={{
+              flex: 1,
+              padding: '8px',
+              border: 'none',
+              borderRadius: '8px',
+              background: mode === 'signin' ? '#4F6BFF' : 'transparent',
+              color: mode === 'signin' ? '#fff' : '#8B94A3',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('signup'); setError(null); setSuccessMessage(null); }}
+            style={{
+              flex: 1,
+              padding: '8px',
+              border: 'none',
+              borderRadius: '8px',
+              background: mode === 'signup' ? '#4F6BFF' : 'transparent',
+              color: mode === 'signup' ? '#fff' : '#8B94A3',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            Create Account
+          </button>
         </div>
 
         {error && (
@@ -107,13 +176,14 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
             padding: '10px 14px',
             borderRadius: '10px',
             fontSize: '13px',
-            marginBottom: '16px'
+            marginBottom: '16px',
+            lineHeight: '1.4'
           }}>
             {error}
           </div>
         )}
 
-        {resetMessage && (
+        {successMessage && (
           <div style={{
             background: 'color-mix(in srgb, #46C285 15%, transparent)',
             border: '1px solid #46C285',
@@ -123,17 +193,18 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
             fontSize: '13px',
             marginBottom: '16px'
           }}>
-            {resetMessage}
+            {successMessage}
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <label style={{ fontSize: '13px', fontWeight: '600', color: '#B9C0CC' }}>Email address</label>
             <input 
               type="email" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
               style={{
                 background: '#12161B',
                 border: '1px solid #262C36',
@@ -153,25 +224,29 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ fontSize: '13px', fontWeight: '600', color: '#B9C0CC' }}>Password</label>
-              <button 
-                type="button" 
-                onClick={handleResetPassword}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: '#4F6BFF', 
-                  fontSize: '12px', 
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                Forgot password?
-              </button>
+              {mode === 'signin' && (
+                <button 
+                  type="button" 
+                  onClick={handleResetPassword}
+                  style={{ 
+                    background: 'none', 
+                    border: 'none', 
+                    color: '#4F6BFF', 
+                    fontSize: '12px', 
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  Forgot password?
+                </button>
+              )}
             </div>
             <input 
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder={mode === 'signup' ? 'Min 6 characters' : 'Enter password'}
+              minLength={mode === 'signup' ? 6 : undefined}
               style={{
                 background: '#12161B',
                 border: '1px solid #262C36',
@@ -205,7 +280,7 @@ export default function LoginScreen({ onGoToHome, onLoggedIn }) {
               transition: 'background 0.15s'
             }}
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? (mode === 'signin' ? 'Signing in...' : 'Creating account...') : (mode === 'signin' ? 'Sign In' : 'Create Account')}
           </button>
         </form>
       </div>
